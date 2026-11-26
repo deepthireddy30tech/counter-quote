@@ -15,6 +15,7 @@ backend/CounterQuote.Api.Tests/   xUnit tests on an in-memory SQLite database
 frontend/src/
   api.ts         types and calls to the API
   pages/         one file per screen
+  lib/           pure logic (measurements, geometry, pricing) with Vitest tests next to it
   main.tsx       routes
 data/app.db      the database, created on first run
 ```
@@ -27,7 +28,8 @@ The web app runs on port 5173 and the API on 5080. Vite sends `/api` to the API.
 |---|---|---|
 | Run the API | `backend/CounterQuote.Api` | `dotnet run` |
 | Run the web app | `frontend` | `npm install`, then `npm run dev` |
-| Run the tests | `backend` | `dotnet test` |
+| Run the backend tests | `backend` | `dotnet test` |
+| Run the frontend tests | `frontend` | `npm test` |
 | Check the frontend | `frontend` | `npm run build` |
 | Change the database | `backend/CounterQuote.Api` | `dotnet tool restore`, then `dotnet ef migrations add <Name>` |
 
