@@ -28,6 +28,7 @@ Confirmed by Deepthi. Source material for ANSWERS.md.
 
 ## Storage
 - **Relational tables, not JSON** (ADR 0003). Jobs → Counters → Legs and Cutouts. QuoteLineItems belong to Jobs, alongside the price list tables.
+- **Line items keep their counter.** QuoteLineItems has a `counter` text column (the counter's name, or "Job" for job-wide lines), so the saved quote and PDF can group lines by counter.
 - **Explicit Save**, with an "Unsaved changes" marker and a warning before leaving the page.
 - **Delete job**, with confirmation and cascade delete.
 
