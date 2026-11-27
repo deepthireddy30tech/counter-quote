@@ -231,7 +231,9 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
             l.cutouts.push({ kind: 'undermount', centerline: Math.round(l.length / 2) || 30, faucetHoles: 1 });
           })}>+ Add cutout</button>
 
-          <h3>Edges and corners</h3>
+          {/* the plan toggles edges and corners with a click; these boxes are the keyboard way, folded away */}
+          <details>
+            <summary>Edges and corners</summary>
           <p className="muted">Checked means exposed: polished and charged. Unchecked is covered by a wall or appliance.</p>
           {counter.legs.flatMap((l, i) => SIDES.filter((s) => (s !== 'start' || i === 0) && (s !== 'end' || i === counter.legs.length - 1)).map((s) => (
             <label key={`${i}${s}`} className="check">
@@ -250,6 +252,7 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
               </label>
             );
           })}
+          </details>
           {job.counters.length > 1 && <button type="button" className="link danger" onClick={removeCounter}>Remove this counter</button>}
         </section>
 

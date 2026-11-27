@@ -66,3 +66,9 @@ label.check { display: flex; gap: 6px; align-items: center; margin: 4px 0; }
 .requirement { display: flex; gap: 4px; align-items: center; }
 .requirement input:not(.number) { flex: 1; min-width: 0; }
 .total { display: flex; justify-content: space-between; font-size: 16px; border-top: 1px solid #e1e5ea; padding-top: 8px; }
+/* the editor fits the window: each column scrolls on its own, so the plan and quote stay in view */
+@media (min-width: 1101px) {
+  .editor { height: calc(100vh - 190px); }
+  .editor > .card { max-height: 100%; overflow-y: auto; box-sizing: border-box; }
+}
+.editor summary { font-weight: 600; font-size: 13px; margin: 16px 0 6px; cursor: pointer; }
