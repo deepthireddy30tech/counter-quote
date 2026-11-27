@@ -29,6 +29,10 @@ Confirmed by Deepthi. Source material for ANSWERS.md.
 ## Storage
 - **Relational tables, not JSON** (ADR 0003). Jobs → Counters → Legs and Cutouts. QuoteLineItems belong to Jobs, alongside the price list tables.
 - **Line items keep their counter.** QuoteLineItems has a `counter` text column (the counter's name, or "Job" for job-wide lines), so the saved quote and PDF can group lines by counter.
+- **Cutouts belong to their leg.** The Cutouts table has legId only (its counter comes through the leg), and the API nests cutouts inside legs, because a new leg has no id until it is saved.
+- **Additional requirements have their own table** (id, jobId, position, description, price), so the salesperson's entries survive a save.
+- **Price list rows in use can't be deleted.** A material or edge profile a saved job uses, or a price group with materials, is refused with a message saying why.
+- **Seed data:** the research summary's starting prices (price groups Granite, Quartz, Marble and Quartzite 1–5; 2 cm is $10 less than 3 cm), seven materials, six edge profiles, the fees (templating $0, bundled into the rate as most shops do), 30-day validity, and one sample job (kitchen L and island).
 - **Explicit Save**, with an "Unsaved changes" marker and a warning before leaving the page.
 - **Delete job**, with confirmation and cascade delete.
 

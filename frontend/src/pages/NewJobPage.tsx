@@ -3,13 +3,10 @@ import { type FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createJob } from '../api';
 
-const MATERIALS = ['Granite', 'Quartz', 'Marble'];
-
 export function NewJobPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [customerName, setCustomerName] = useState('');
-  const [material, setMaterial] = useState(MATERIALS[0]);
 
   const save = useMutation({
     mutationFn: createJob,
@@ -21,7 +18,7 @@ export function NewJobPage() {
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
-    save.mutate({ customerName, material });
+    save.mutate({ customerName });
   };
 
   return (
@@ -32,12 +29,6 @@ export function NewJobPage() {
         <label>
           Customer
           <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} required />
-        </label>
-        <label>
-          Material
-          <select value={material} onChange={(e) => setMaterial(e.target.value)}>
-            {MATERIALS.map((m) => <option key={m}>{m}</option>)}
-          </select>
         </label>
         <button type="submit" className="button" disabled={save.isPending}>Save job</button>
       </form>

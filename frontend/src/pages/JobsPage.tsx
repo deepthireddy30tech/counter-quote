@@ -13,14 +13,15 @@ export function JobsPage() {
       <h1>Jobs</h1>
       <table>
         <thead>
-          <tr><th>#</th><th>Customer</th><th>Material</th></tr>
+          <tr><th>#</th><th>Customer</th><th>Counters</th><th>Total</th></tr>
         </thead>
         <tbody>
           {jobs.map((job) => (
             <tr key={job.id}>
               <td>{job.id}</td>
               <td><Link to={`/jobs/${job.id}`}>{job.customerName}</Link></td>
-              <td>{job.material}</td>
+              <td>{job.counters.length}</td>
+              <td>{job.total == null ? 'Not priced' : `$${job.total.toFixed(2)}`}</td>
             </tr>
           ))}
         </tbody>

@@ -10,7 +10,7 @@ backend/CounterQuote.Api/
   Data/          AppDbContext: one DbSet per table
   Migrations/    generated database changes; don't edit by hand
   Controllers/   the API; returns the models directly
-  Program.cs     startup; applies migrations, adds two sample jobs
+  Program.cs     startup; applies migrations, then Data/Seed.cs adds the starting price list and a sample job to empty tables
 backend/CounterQuote.Api.Tests/   xUnit tests on an in-memory SQLite database
 frontend/src/
   api.ts         types and calls to the API
