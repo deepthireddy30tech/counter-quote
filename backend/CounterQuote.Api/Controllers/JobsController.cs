@@ -35,7 +35,7 @@ public class JobsController(AppDbContext db) : ControllerBase
             return BadPrices(problem);
         job.Id = 0;
         job.CreatedDate = DateTime.UtcNow;
-        Number(job);
+        ResetChildRows(job);
         db.Jobs.Add(job);
         await db.SaveChangesAsync();
         return CreatedAtAction(nameof(Get), new { id = job.Id }, job);
@@ -53,7 +53,7 @@ public class JobsController(AppDbContext db) : ControllerBase
 
         changes.Id = id;
         changes.CreatedDate = job.CreatedDate;
-        Number(changes);
+        ResetChildRows(changes);
         db.Entry(job).CurrentValues.SetValues(changes);
         // SetValues skips lists, and clearing a list deletes its rows
         job.Counters.Clear();
@@ -96,7 +96,7 @@ public class JobsController(AppDbContext db) : ControllerBase
     }
 
     /// <summary>Child rows are always new: clear their ids and number them in request order.</summary>
-    private static void Number(Job job)
+    private static void ResetChildRows(Job job)
     {
         foreach (var (c, i) in job.Counters.Select((c, i) => (c, i)))
         {

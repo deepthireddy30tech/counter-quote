@@ -54,6 +54,10 @@ public static class Seed
             db.SaveChanges();
         }
 
+        // the two starter jobs from before counters existed can't be priced, so the sample replaces them
+        db.Jobs.RemoveRange(db.Jobs.Where(j => (j.CustomerName == "Sample: Kitchen" || j.CustomerName == "Sample: Bathroom") && !j.Counters.Any()));
+        db.SaveChanges();
+
         if (!db.Jobs.Any())
         {
             int steelGrey = db.Materials.Single(m => m.Name == "Steel Grey").Id;

@@ -46,6 +46,8 @@ public class PriceListController(AppDbContext db) : ControllerBase
             if (incoming.Materials.Any(m => m.PriceGroupId == removed.Id))
                 return Conflict(new ProblemDetails { Title = $"{removed.Name} still has materials, so it can't be deleted." });
 
+        foreach (PriceGroup g in incoming.PriceGroups.Where(g => g.Id == 0)) // rates of a new group are new rows too
+            g.Rates = g.Rates.Select(r => new PriceGroupRate { Thickness = r.Thickness, PricePerSqFt = r.PricePerSqFt }).ToList();
         Sync(groups, incoming.PriceGroups, g => g.Id);
         foreach (PriceGroup g in incoming.PriceGroups.Where(g => g.Id != 0))
             SyncRates(groups.Single(x => x.Id == g.Id), g.Rates);
@@ -57,7 +59,7 @@ public class PriceListController(AppDbContext db) : ControllerBase
         return await Get();
     }
 
-    /// <summary>Ids that don't exist, materials pointing at a group that was never saved, or unknown fee kinds.</summary>
+    /// <summary>Ids that don't exist, materials pointing at a group that was never saved, two rates for one thickness, or unknown fee kinds.</summary>
     private static string? Problem(PriceList incoming, List<PriceGroup> groups, List<Material> materials, List<EdgeProfile> profiles, List<Fee> fees)
     {
         bool Unknown<T>(List<T> current, List<T> items, Func<T, int> id) => items.Any(i => id(i) != 0 && current.All(c => id(c) != id(i)));
@@ -66,6 +68,8 @@ public class PriceListController(AppDbContext db) : ControllerBase
                 ? "The price list changed since it was loaded. Reload the page and try again."
             : incoming.Materials.FirstOrDefault(m => groups.All(g => g.Id != m.PriceGroupId)) is Material lost
                 ? $"{lost.Name} needs a saved price group."
+            : incoming.PriceGroups.FirstOrDefault(g => g.Rates.DistinctBy(r => r.Thickness).Count() < g.Rates.Count) is PriceGroup twice
+                ? $"{twice.Name} has two rates for the same thickness."
             : incoming.Fees.FirstOrDefault(f => fees.All(x => x.Kind != f.Kind)) is Fee fee
                 ? $"There is no fee called {fee.Kind}."
             : null;

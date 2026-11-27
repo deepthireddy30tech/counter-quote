@@ -149,4 +149,18 @@ public class JobsControllerTests : IDisposable
         Job sample = db.Jobs.Include(j => j.Counters).ThenInclude(c => c.Legs).Single();
         Assert.Equal([2, 1], sample.Counters.OrderBy(c => c.Position).Select(c => c.Legs.Count));
     }
+
+    [Fact]
+    public void The_sample_job_replaces_the_old_starter_jobs_but_not_real_ones()
+    {
+        using AppDbContext db = CreateDb();
+        db.Jobs.AddRange(
+            new Job { CustomerName = "Sample: Kitchen", CreatedDate = DateTime.UtcNow },
+            new Job { CustomerName = "Sample: Bathroom", CreatedDate = DateTime.UtcNow });
+        db.SaveChanges();
+
+        Seed.Run(db);
+
+        Assert.Equal("Sample: kitchen L and island", Assert.Single(db.Jobs).CustomerName);
+    }
 }

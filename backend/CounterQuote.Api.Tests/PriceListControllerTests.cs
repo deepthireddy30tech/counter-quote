@@ -70,6 +70,27 @@ public class PriceListControllerTests : IDisposable
         Assert.Equal(80m, saved.Fees.Single(f => f.Kind == "seam").Amount);
     }
 
+    [Fact]
+    public async Task A_new_price_group_saves_with_its_rates_even_if_they_carry_ids()
+    {
+        PriceList list = await Load();
+        list.PriceGroups.Add(new PriceGroup { Name = "Granite 6", Rates = [new() { Id = 1, Thickness = 2, PricePerSqFt = 70 }, new() { Id = 2, Thickness = 3, PricePerSqFt = 80 }] });
+
+        Assert.NotNull((await Save(list)).Value);
+
+        PriceGroup added = (await Load()).PriceGroups.Single(g => g.Name == "Granite 6");
+        Assert.Equal([(2, 70m), (3, 80m)], added.Rates.Select(r => (r.Thickness, r.PricePerSqFt)));
+    }
+
+    [Fact]
+    public async Task Two_rates_for_one_thickness_are_refused()
+    {
+        PriceList list = await Load();
+        list.PriceGroups[0].Rates.Add(new PriceGroupRate { Thickness = 3, PricePerSqFt = 99 });
+
+        Assert.IsType<BadRequestObjectResult>((await Save(list)).Result);
+    }
+
     [Theory]
     [InlineData("material")]
     [InlineData("edge profile")]
