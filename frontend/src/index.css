@@ -30,3 +30,4 @@ ul.errors { margin: 8px 0; padding-left: 28px; }
 .unsaved { color: #8a5a00; font-weight: 600; }
 tr.removed td { background: #f7f7f7; }
 tr.removed input { text-decoration: line-through; color: #66727f; }
+.card table .changed { background: #fff4cc; border-color: #d9a400; box-shadow: 0 0 0 1px #d9a400; }

@@ -12,10 +12,17 @@ export function PriceListPage() {
   return <PriceListForm saved={data} />;
 }
 
-/** A number box that keeps an empty box as NaN, so the check can ask for a value. */
-function NumberInput({ value, onChange, label, step = '0.01' }: { value: number; onChange: (n: number) => void; label: string; step?: string }) {
+/**
+ * A number box that keeps an empty box as NaN, so the check can ask for a value.
+ * `was` is the saved value: the box is highlighted when it differs (undefined = a new row).
+ */
+function NumberInput({ value, was, onChange, label, step = '0.01', unit = '$' }:
+  { value: number; was: number | undefined; onChange: (n: number) => void; label: string; step?: string; unit?: string }) {
+  const changed = value !== was;
+  const before = was === undefined ? 'New' : `Was ${unit === '$' ? `$${was}` : `${was} ${unit}`}`;
   return (
-    <input type="number" min="0" step={step} aria-label={label} className="number"
+    <input type="number" min="0" step={step} className={changed ? 'number changed' : 'number'}
+      aria-label={changed ? `${label} (changed, ${before.toLowerCase()})` : label} title={changed ? before : undefined}
       value={Number.isNaN(value) ? '' : value} onChange={(e) => onChange(e.target.valueAsNumber)} />
   );
 }
@@ -88,6 +95,12 @@ function PriceListForm({ saved }: { saved: PriceList }) {
     setJustSaved(false);
   };
   const savedGroups = toSave.priceGroups.filter((g) => g.id !== 0);
+  // the saved values each box is compared with, to highlight changed prices
+  const wasRate = (groupId: number, t: number) => stored.priceGroups.find((g) => g.id === groupId)?.rates.find((r) => r.thickness === t)?.pricePerSqFt;
+  const wasMaterial = (id: number) => stored.materials.find((m) => m.id === id);
+  const wasEdge = (id: number) => stored.edgeProfiles.find((e) => e.id === id)?.pricePerLinearFt;
+  const wasFee = (kind: string) => stored.fees.find((f) => f.kind === kind)?.amount;
+  const groupName = (id: number) => stored.priceGroups.find((g) => g.id === id)?.name;
   const fees = Object.keys(FEE_LABELS).flatMap((kind) => list.fees.filter((f) => f.kind === kind));
 
   const handleSubmit = (event: FormEvent) => {
@@ -121,7 +134,7 @@ function PriceListForm({ saved }: { saved: PriceList }) {
       <div className="page-title">
         <h1>Price list</h1>
         <div className="page-actions">
-          {unsaved && <span className="unsaved">Unsaved changes</span>}
+          {unsaved && <span className="unsaved">Unsaved changes <span className="muted">(highlighted)</span></span>}
           <button type="submit" className="button" disabled={save.isPending}>Save price list</button>
         </div>
       </div>
@@ -139,7 +152,7 @@ function PriceListForm({ saved }: { saved: PriceList }) {
               const r = g.rates.findIndex((x) => x.thickness === t);
               return (
                 <td key={t}>
-                  $ <NumberInput label={`${g.name} ${t} cm price per sq ft`} value={g.rates[r]?.pricePerSqFt ?? NaN}
+                  $ <NumberInput label={`${g.name} ${t} cm price per sq ft`} value={g.rates[r]?.pricePerSqFt ?? NaN} was={wasRate(g.id, t)}
                     onChange={(n) => change((d) => {
                       const rates = d.priceGroups[i].rates;
                       if (r >= 0) rates[r].pricePerSqFt = n;
@@ -164,6 +177,8 @@ function PriceListForm({ saved }: { saved: PriceList }) {
             {list.materials.map((m, i) => row('materials', i, 'Material', (
               <td>
                 <select aria-label={`${m.name} price group`} value={m.priceGroupId}
+                  className={wasMaterial(m.id)?.priceGroupId === m.priceGroupId ? undefined : 'changed'}
+                  title={wasMaterial(m.id) && wasMaterial(m.id)!.priceGroupId !== m.priceGroupId ? `Was ${groupName(wasMaterial(m.id)!.priceGroupId)}` : undefined}
                   onChange={(e) => change((d) => { d.materials[i].priceGroupId = Number(e.target.value); })}>
                   <option value={0}>Choose…</option>
                   {savedGroups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
@@ -182,7 +197,7 @@ function PriceListForm({ saved }: { saved: PriceList }) {
           <thead><tr><th>Name</th><th>Per linear ft</th><th /></tr></thead>
           <tbody>
             {list.edgeProfiles.map((e, i) => row('edgeProfiles', i, 'Edge profile', (
-              <td>$ <NumberInput label={`${e.name} price per linear ft`} value={e.pricePerLinearFt}
+              <td>$ <NumberInput label={`${e.name} price per linear ft`} value={e.pricePerLinearFt} was={wasEdge(e.id)}
                 onChange={(n) => change((d) => { d.edgeProfiles[i].pricePerLinearFt = n; })} /></td>
             )))}
           </tbody>
@@ -199,7 +214,8 @@ function PriceListForm({ saved }: { saved: PriceList }) {
                 <td>{feeLabel(f.kind)}</td>
                 <td>
                   {!isDays(f.kind) && '$ '}
-                  <NumberInput label={feeLabel(f.kind)} step={isDays(f.kind) ? '1' : '0.01'} value={f.amount}
+                  <NumberInput label={feeLabel(f.kind)} step={isDays(f.kind) ? '1' : '0.01'} unit={isDays(f.kind) ? 'days' : '$'}
+                    value={f.amount} was={wasFee(f.kind)}
                     onChange={(n) => change((d) => { d.fees.find((x) => x.kind === f.kind)!.amount = n; })} />
                 </td>
               </tr>
