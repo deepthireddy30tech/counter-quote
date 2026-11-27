@@ -139,21 +139,38 @@ public class JobsControllerTests : IDisposable
         Assert.Empty(db.Jobs);
     }
 
-    [Fact]
-    public void The_seed_adds_one_sample_job_only_once()
+    /// <summary>A database as it was before the price list existed: migrated, nothing seeded.</summary>
+    private static AppDbContext NewDatabase(SqliteConnection connection)
     {
-        using AppDbContext db = CreateDb();
-        Seed.Run(db);
-        Seed.Run(db);
-
-        Job sample = db.Jobs.Include(j => j.Counters).ThenInclude(c => c.Legs).Single();
-        Assert.Equal([2, 1], sample.Counters.OrderBy(c => c.Position).Select(c => c.Legs.Count));
+        connection.Open();
+        var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options);
+        db.Database.Migrate();
+        return db;
     }
 
     [Fact]
-    public void The_sample_job_replaces_the_old_starter_jobs_but_not_real_ones()
+    public void A_new_database_gets_one_sample_job_and_the_seed_never_adds_it_again()
     {
-        using AppDbContext db = CreateDb();
+        using var connection = new SqliteConnection("Data Source=:memory:");
+        using AppDbContext db = NewDatabase(connection);
+        Seed.Run(db);
+        Seed.Run(db);
+        Job sample = db.Jobs.Include(j => j.Counters).ThenInclude(c => c.Legs).Single();
+        Assert.Equal([2, 1], sample.Counters.OrderBy(c => c.Position).Select(c => c.Legs.Count));
+
+        db.Jobs.Remove(sample);
+        db.Materials.RemoveRange(db.Materials.Where(m => m.Name == "Steel Grey")); // the shop may delete the sample's material
+        db.SaveChanges();
+        Seed.Run(db);
+
+        Assert.Empty(db.Jobs);
+    }
+
+    [Fact]
+    public void The_sample_job_replaces_the_old_starter_jobs()
+    {
+        using var connection = new SqliteConnection("Data Source=:memory:");
+        using AppDbContext db = NewDatabase(connection);
         db.Jobs.AddRange(
             new Job { CustomerName = "Sample: Kitchen", CreatedDate = DateTime.UtcNow },
             new Job { CustomerName = "Sample: Bathroom", CreatedDate = DateTime.UtcNow });
@@ -162,5 +179,16 @@ public class JobsControllerTests : IDisposable
         Seed.Run(db);
 
         Assert.Equal("Sample: kitchen L and island", Assert.Single(db.Jobs).CustomerName);
+    }
+
+    [Fact]
+    public async Task The_seed_leaves_a_shops_own_jobs_alone()
+    {
+        await Create(KitchenL("Sample: Kitchen")); // same name as a starter job, but it has counters
+        using AppDbContext db = CreateDb();
+
+        Seed.Run(db);
+
+        Assert.Equal("Sample: Kitchen", Assert.Single(db.Jobs).CustomerName);
     }
 }

@@ -5,6 +5,7 @@ import { BrowserRouter, Link, Route, Routes } from 'react-router-dom';
 import { JobPage } from './pages/JobPage';
 import { JobsPage } from './pages/JobsPage';
 import { NewJobPage } from './pages/NewJobPage';
+import { PriceListPage } from './pages/PriceListPage';
 import './index.css';
 
 createRoot(document.getElementById('root')!).render(
@@ -13,13 +14,17 @@ createRoot(document.getElementById('root')!).render(
       <BrowserRouter>
         <header className="app-header">
           <Link to="/" className="app-title">Counter Quote</Link>
-          <Link to="/jobs/new" className="button">New job</Link>
+          <nav className="app-nav">
+            <Link to="/price-list">Price list</Link>
+            <Link to="/jobs/new" className="button">New job</Link>
+          </nav>
         </header>
         <main>
           <Routes>
             <Route path="/" element={<JobsPage />} />
             <Route path="/jobs/new" element={<NewJobPage />} />
             <Route path="/jobs/:id" element={<JobPage />} />
+            <Route path="/price-list" element={<PriceListPage />} />
           </Routes>
         </main>
       </BrowserRouter>
