@@ -9,6 +9,7 @@ Confirmed by Deepthi. Source material for ANSWERS.md.
 ## Shape
 - A counter is a **chain of legs** (ADR 0001). Straight, L and U are 1, 2 and 3 legs.
 - **Angled legs** and **more than three legs** are in. Bumpouts and freehand are out.
+- **Turn angle** must be between 45° and 175°. Every corner turns toward the front (the room); corners that stick out the other way are out, with bumpouts.
 - **Length** is measured along the wall (back edge) into the corner, the way it's taped on site. Area comes from the outline.
 - A **job** holds several **counters**. Each counter has its own material, edge profile, thickness and room.
 - **Room** is one of Kitchen, Island, Bathroom or Other. It sets starting depth and edge defaults. An Island starts with every edge exposed.
@@ -21,6 +22,7 @@ Confirmed by Deepthi. Source material for ANSWERS.md.
 - **Price per sq ft** comes from the price group and thickness, with one row per group and thickness. Waste and installation are built into the rate.
 - **Charged area** is rounded up to the next whole sq ft.
 - **Line items**: edge profile per linear ft, cutouts each, faucet holes each, radius corners each, backsplash per linear ft, templating, optional tear-out, and a minimum job charge.
+- **Additional requirements**: the salesperson can add free-text lines with a price for work the price list doesn't cover. A blank price shows the line at $0. They count toward the minimum job charge.
 - **Seams** are charged only if research supports it. The slab estimate is shown as a check.
 - **Saved quote** stays as saved, with a "prices have changed" notice. Editing or Re-price switches to today's prices. Every quote has a valid-until date.
 
