@@ -41,9 +41,9 @@ describe('priceListProblems', () => {
     l.edgeProfiles[0].pricePerLinearFt = -5;
     l.fees[0].amount = NaN;
     expect(priceListProblems(l)).toEqual([
-      'Granite 2 needs a 3 cm price of $0 or more.',
-      'Ogee needs a price of $0 or more.',
-      'Seam needs an amount of $0 or more.',
+      'Granite 2 needs a 3 cm price from $0 to $10,000.',
+      'Ogee needs a price from $0 to $10,000.',
+      'Seam needs an amount from $0 to $1,000,000.',
     ]);
   });
 
@@ -56,6 +56,24 @@ describe('priceListProblems', () => {
   it('needs quotes to stay valid for a whole number of days', () => {
     const l = list();
     l.fees[1].amount = 0.5;
-    expect(priceListProblems(l)).toEqual(['Quotes must stay valid for a whole number of days, at least 1.']);
+    expect(priceListProblems(l)).toEqual(['Quotes must stay valid for a whole number of days, from 1 to 3,650.']);
+  });
+
+  it('keeps to the limits the server stores', () => {
+    const l = list();
+    l.materials[0].name = 'x'.repeat(101);
+    l.priceGroups[0].rates[0].pricePerSqFt = 10_001;
+    l.fees[0].amount = 1_000_001;
+    expect(priceListProblems(l)).toEqual([
+      `${'x'.repeat(30)}… is too long; names can have 100 characters.`,
+      'Granite 2 needs a 2 cm price from $0 to $10,000.',
+      'Seam needs an amount from $0 to $1,000,000.',
+    ]);
+  });
+
+  it('needs at least one price group, material and edge profile', () => {
+    const l = list();
+    l.edgeProfiles = [];
+    expect(priceListProblems(l)).toEqual(['The price list needs at least one price group, one material and one edge profile.']);
   });
 });

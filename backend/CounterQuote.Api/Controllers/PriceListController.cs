@@ -59,12 +59,15 @@ public class PriceListController(AppDbContext db) : ControllerBase
         return await Get();
     }
 
-    /// <summary>Ids that don't exist, materials pointing at a group that was never saved, two rates for one thickness, or unknown fee kinds.</summary>
+    /// <summary>An empty section, ids that don't exist, materials pointing at a group that was never saved, two rates for one thickness, or unknown fee kinds.</summary>
     private static string? Problem(PriceList incoming, List<PriceGroup> groups, List<Material> materials, List<EdgeProfile> profiles, List<Fee> fees)
     {
         bool Unknown<T>(List<T> current, List<T> items, Func<T, int> id) => items.Any(i => id(i) != 0 && current.All(c => id(c) != id(i)));
         return
-            Unknown(groups, incoming.PriceGroups, g => g.Id) || Unknown(materials, incoming.Materials, m => m.Id) || Unknown(profiles, incoming.EdgeProfiles, e => e.Id)
+            incoming.PriceGroups.Count == 0 || incoming.Materials.Count == 0 || incoming.EdgeProfiles.Count == 0
+                // an empty price list can't price anything, and the seed would take it for a new database
+                ? "The price list needs at least one price group, one material and one edge profile."
+            : Unknown(groups, incoming.PriceGroups, g => g.Id) || Unknown(materials, incoming.Materials, m => m.Id) || Unknown(profiles, incoming.EdgeProfiles, e => e.Id)
                 ? "The price list changed since it was loaded. Reload the page and try again."
             : incoming.Materials.FirstOrDefault(m => groups.All(g => g.Id != m.PriceGroupId)) is Material lost
                 ? $"{lost.Name} needs a saved price group."

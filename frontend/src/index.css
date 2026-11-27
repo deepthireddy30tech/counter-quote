@@ -26,3 +26,7 @@ th { font-weight: 600; background: #eef1f4; }
 .link { background: none; border: 0; padding: 4px 0; color: #1d5fa8; font: inherit; cursor: pointer; }
 .saved { color: #1b6b35; background: #e8f5ec; border: 1px solid #b9dfc4; border-radius: 4px; padding: 8px; }
 ul.errors { margin: 8px 0; padding-left: 28px; }
+.page-actions { display: flex; gap: 12px; align-items: center; }
+.unsaved { color: #8a5a00; font-weight: 600; }
+tr.removed td { background: #f7f7f7; }
+tr.removed input { text-decoration: line-through; color: #66727f; }
