@@ -49,7 +49,7 @@ export type PriceList = {
 /** counter is the counter's name, or 'Job' for job-wide lines. */
 export type LineItem = { counter: string; description: string; quantity: number; unit: string; rate: number; amount: number };
 /** The slab estimate is a check for the salesperson; it doesn't change the price. */
-export type CounterSummary = { name: string; areaSqFt: number; slabs: number; seams: number };
+export type CounterSummary = { name: string; areaSqFt: number; slabEstimate: number; seams: number };
 /** Any error stops the quote: no items and no total. Warnings only flag. */
 export type Quote = { items: LineItem[]; total: number | null; counters: CounterSummary[]; errors: string[]; warnings: string[] };
 
@@ -61,6 +61,8 @@ const CUTOUTS: Record<CutoutKind, { name: string; width: number; depth: number }
   cooktop: { name: 'Cooktop', width: 30, depth: 20 },
 };
 const CUTOUT_CLEARANCE = 3; // inches to an edge, corner or seam (docs/research/pricing.md §11)
+// shortcut: two slab sizes picked by the price group's name; move them to the price list if shops need others
+const SLAB = { quartz: { length: 120, width: 56 }, stone: { length: 110, width: 65 } };
 
 /** Usual depth range per room, in inches; outside it only warns. */
 const USUAL_DEPTH: Record<Room, [number, number] | null> = {
@@ -70,7 +72,7 @@ const USUAL_DEPTH: Record<Room, [number, number] | null> = {
   Other: null,
 };
 
-type CounterPrice = { items: LineItem[]; errors: string[]; warnings: string[]; areaSqFt: number; slabs: number; seams: number };
+type CounterPrice = { items: LineItem[]; errors: string[]; warnings: string[]; areaSqFt: number; slabEstimate: number; seams: number };
 
 /** Prices a whole job from the shop's price list. */
 export function priceJob(job: Job, prices: PriceList, unit: Unit): Quote {
@@ -79,12 +81,12 @@ export function priceJob(job: Job, prices: PriceList, unit: Unit): Quote {
   const named = (i: number) => (message: string) => `${names[i]}: ${message}`;
   const errors = counters.flatMap((c, i) => c.errors.map(named(i)));
   const warnings = counters.flatMap((c, i) => c.warnings.map(named(i)));
-  const summaries = counters.map((c, i) => ({ name: names[i], areaSqFt: c.areaSqFt, slabs: c.slabs, seams: c.seams }));
+  const summaries = counters.map((c, i) => ({ name: names[i], areaSqFt: c.areaSqFt, slabEstimate: c.slabEstimate, seams: c.seams }));
   if (errors.length) return { items: [], total: null, counters: summaries, errors, warnings };
   const items = counters.flatMap((c, i) => c.items.map((x) => ({ ...x, counter: names[i] })));
   const fees = prices.fees;
   const add = (description: string, amount: number) =>
-    items.push({ counter: 'Job', description, quantity: 1, unit: 'job', rate: amount, amount: cents(amount) });
+    items.push({ counter: 'Job', description, quantity: 1, unit: 'job', rate: cents(amount), amount: cents(amount) });
   if (fees.templating > 0) add('Templating visit', fees.templating);
   if (job.tearOut) add('Tear-out of old counters', fees.tearOut);
   for (const r of job.additionalRequirements) if (r.description.trim()) add(r.description.trim(), Math.max(0, r.price));
@@ -97,12 +99,12 @@ function priceCounter(counter: Counter, prices: PriceList, unit: Unit): CounterP
   const outline = counterOutline(counter.legs);
   const material = prices.materials.find((m) => m.id === counter.materialId);
   const group = prices.priceGroups.find((g) => g.id === material?.priceGroupId);
-  const edge = prices.edgeProfiles.find((e) => e.id === counter.edgeProfileId);
+  const profile = prices.edgeProfiles.find((e) => e.id === counter.edgeProfileId);
   const errors = [...outline.errors];
   if (!material || !group) errors.push('its material is no longer in the price list.');
-  if (!edge) errors.push('its edge profile is no longer in the price list.');
-  const none = { items: [], warnings: [], areaSqFt: 0, slabs: 0, seams: 0 };
-  if (errors.length || !material || !group || !edge) return { ...none, errors };
+  if (!profile) errors.push('its edge profile is no longer in the price list.');
+  const none = { items: [], warnings: [], areaSqFt: 0, slabEstimate: 0, seams: 0 };
+  if (errors.length || !material || !group || !profile) return { ...none, errors };
   const fit = checkCutouts(counter, outline, unit);
   if (fit.errors.length) return { ...none, errors: fit.errors };
   const slab = slabCheck(counter, group.name, unit);
@@ -117,15 +119,15 @@ function priceCounter(counter: Counter, prices: PriceList, unit: Unit): CounterP
     cents(outline.sides.filter((s) => isCovered(s.leg, s.side) === covered).reduce((sum, s) => sum + s.length, 0) / 12);
   const fees = prices.fees;
 
-  add(`${material.name}, ${counter.thickness} cm`, Math.ceil(outline.area / 144 - 1e-9), 'sq ft', group.pricePerSqFt[counter.thickness]);
-  add(`${edge.name} edge`, feet(false), 'lf', edge.pricePerLinearFt);
+  add(`${material.name}, ${counter.thickness} cm`, roundUp(outline.area / 144), 'sq ft', group.pricePerSqFt[counter.thickness]);
+  add(`${profile.name} edge`, feet(false), 'lf', profile.pricePerLinearFt);
   for (const kind of Object.keys(CUTOUTS) as CutoutKind[])
     add(`${CUTOUTS[kind].name} cutout`, counter.cutouts.filter((c) => c.kind === kind).length, 'each', fees[kind]);
   add('Faucet hole', counter.cutouts.reduce((sum, c) => sum + (c.kind === 'cooktop' ? 0 : c.faucetHoles), 0), 'each', fees.faucetHole);
   add('Radius corner', radiusCorners(counter.legs), 'each', fees.radiusCorner);
   if (counter.backsplash) add('4″ backsplash', feet(true), 'lf', fees.backsplash);
   if (fees.seam > 0) add('Seam', slab.seams, 'each', fees.seam);
-  return { items, errors: [], warnings, areaSqFt: outline.area / 144, slabs: slab.slabs, seams: slab.seams };
+  return { items, errors: [], warnings, areaSqFt: outline.area / 144, slabEstimate: slab.slabEstimate, seams: slab.seams };
 }
 
 function otherWarnings(counter: Counter, unit: Unit): string[] {
@@ -146,21 +148,19 @@ function otherWarnings(counter: Counter, unit: Unit): string[] {
  * Slabs: the pieces packed end to end into slab-length strips, as many strips across a slab as its width allows.
  */
 function slabCheck(counter: Counter, groupName: string, unit: Unit) {
-  // shortcut: slab size comes from the price group's name (Quartz vs natural stone); move it to the price list if shops need other sizes
-  const kind = groupName.split(' · ')[0].toLowerCase();
-  const slab = kind === 'quartz' ? { length: 120, width: 56 } : { length: 110, width: 65 };
+  const slab = /quartz/i.test(groupName) ? SLAB.quartz : SLAB.stone;
   const warnings: string[] = [];
   const pieces: number[] = [];
   let seams = counter.legs.length - 1;
   counter.legs.forEach((l, i) => {
-    if (l.length > slab.length)
+    const pastCorner = l.length - (i > 0 ? counter.legs[i - 1].depth : 0); // the corner square belongs to the leg before
+    const parts = Math.max(1, roundUp(pastCorner / slab.length));
+    if (parts > 1)
       warnings.push(
-        `Leg ${i + 1} (${formatMeasurement(l.length, unit)}) is longer than a ${kind} slab (${formatMeasurement(slab.length, unit)}). It needs a seam.`,
+        `Leg ${i + 1} (${formatMeasurement(l.length, unit)}) is longer than a slab (${formatMeasurement(slab.length, unit)}). It needs a seam.`,
       );
-    const run = l.length - (i > 0 ? counter.legs[i - 1].depth : 0); // the corner square belongs to the leg before
-    const parts = Math.max(1, Math.ceil(run / slab.length - 1e-9));
     seams += parts - 1;
-    for (let p = 0; p < parts; p++) pieces.push(run / parts);
+    for (let p = 0; p < parts; p++) pieces.push(pastCorner / parts);
   });
   const strips: number[] = [];
   for (const piece of pieces.sort((a, b) => b - a)) {
@@ -169,7 +169,7 @@ function slabCheck(counter: Counter, groupName: string, unit: Unit) {
     else strips.push(piece);
   }
   const perSlab = Math.max(1, Math.floor(slab.width / Math.max(...counter.legs.map((l) => l.depth))));
-  return { seams, slabs: Math.ceil(strips.length / perSlab), warnings };
+  return { seams, slabEstimate: Math.ceil(strips.length / perSlab), warnings };
 }
 
 /** Each cutout must sit on the front edge's straight part of its leg, and fit front to back. */
@@ -192,8 +192,16 @@ function checkCutouts(counter: Counter, outline: Outline, unit: Unit): { errors:
     if (before < 0 || after < 0 || spare <= 0)
       return errors.push(`${label} doesn’t fit on leg ${c.leg + 1} at ${formatMeasurement(c.centerline, unit)}.`);
     if (Math.min(before, after, spare) < CUTOUT_CLEARANCE)
-      warnings.push(`${label} is less than ${CUTOUT_CLEARANCE}″ from an edge or corner.`);
+      warnings.push(`${label} is less than ${formatMeasurement(CUTOUT_CLEARANCE, unit)} from an edge or corner.`);
   });
+  // two cutouts on one leg can't share stone
+  counter.cutouts.forEach((a, i) =>
+    counter.cutouts.slice(i + 1).forEach((b, k) => {
+      const reach = (CUTOUTS[a.kind].width + CUTOUTS[b.kind].width) / 2;
+      if (a.leg === b.leg && Math.abs(a.centerline - b.centerline) < reach)
+        errors.push(`${CUTOUTS[a.kind].name} ${i + 1} and ${CUTOUTS[b.kind].name} ${i + k + 2} overlap.`);
+    }),
+  );
   return { errors, warnings };
 }
 
@@ -222,3 +230,4 @@ function counterNames(counters: Counter[]): string[] {
 }
 
 const cents = (v: number) => Math.round(v * 100) / 100;
+const roundUp = (v: number) => Math.ceil(v - 1e-9); // ignore float noise like 34.0000000001

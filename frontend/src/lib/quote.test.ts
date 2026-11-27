@@ -3,8 +3,8 @@ import { priceJob, type Counter, type CounterLeg, type Job, type PriceList } fro
 
 const prices: PriceList = {
   priceGroups: [
-    { id: 'g2', name: 'Granite · Level 2', pricePerSqFt: { 2: 48, 3: 58 } },
-    { id: 'q1', name: 'Quartz · Level 1', pricePerSqFt: { 2: 55, 3: 65 } },
+    { id: 'g2', name: 'Granite 2', pricePerSqFt: { 2: 48, 3: 58 } },
+    { id: 'q1', name: 'Quartz 1', pricePerSqFt: { 2: 55, 3: 65 } },
   ],
   materials: [
     { id: 'steel', name: 'Steel Grey', priceGroupId: 'g2' },
@@ -147,6 +147,17 @@ describe('priceJob: impossible shapes and cutout fit', () => {
     expect(quote(vanity).errors).toEqual(['Bathroom: Drop-in sink 1 doesn’t fit on leg 1 at 18″.']);
   });
 
+  it('stops the quote for two cutouts that overlap on a leg', () => {
+    // sink spans 45–75", cooktop 60–90"
+    const cooktop = { kind: 'cooktop' as const, leg: 0, centerline: 75, faucetHoles: 0 };
+    expect(quote(kitchenL({ cutouts: [sink(60), cooktop] })).errors).toEqual(['Kitchen L: Undermount sink 1 and Cooktop 2 overlap.']);
+  });
+
+  it('shows the clearance in the chosen unit', () => {
+    const q = priceJob(job({ counters: [kitchenL({ cutouts: [sink(78)] })] }), prices, 'm');
+    expect(q.warnings).toContain('Kitchen L: Undermount sink 1 is less than 7.6 cm from an edge or corner.');
+  });
+
   it.each([
     ['1 1/2" from the corner', [sink(78)]],
     ['exactly at the start', [sink(15)]],
@@ -178,14 +189,21 @@ describe('priceJob: warnings and slab check', () => {
     // leg 1 (120") needs two pieces of 60"; leg 2 adds 96 − 25.5 = 70.5" past the corner.
     // pieces 70.5, 60, 60 don't pair up within 110", so 3 strips; 2 strips fit across a 65" slab
     const q = quote(kitchenL());
-    expect(q.counters).toEqual([{ name: 'Kitchen L', areaSqFt: 33.734375, slabs: 2, seams: 2 }]);
-    expect(q.warnings).toEqual(['Kitchen L: Leg 1 (10′ 0″) is longer than a granite slab (9′ 2″). It needs a seam.']);
+    expect(q.counters).toEqual([{ name: 'Kitchen L', areaSqFt: 33.734375, slabEstimate: 2, seams: 2 }]);
+    expect(q.warnings).toEqual(['Kitchen L: Leg 1 (10′ 0″) is longer than a slab (9′ 2″). It needs a seam.']);
+  });
+
+  it('warns about a long leg only when the part past the corner is longer than a slab', () => {
+    // leg 2 is 115" but only 115 − 25.5 = 89.5" lies past the corner, which fits a 110" granite slab
+    const q = quote(kitchenL({ legs: [leg(96, 25.5, 0), leg(115, 25.5, 90)], cutouts: [] }));
+    expect(q.warnings).toEqual([]);
+    expect(q.counters[0].seams).toBe(1);
   });
 
   it('estimates slabs and seams for the same L in quartz', () => {
     // 120" fits a 120" slab: pieces 120 and 70.5 need 2 strips, both fit across 56"
     const q = quote(kitchenL({ materialId: 'arctic' }));
-    expect(q.counters).toEqual([{ name: 'Kitchen L', areaSqFt: 33.734375, slabs: 1, seams: 1 }]);
+    expect(q.counters).toEqual([{ name: 'Kitchen L', areaSqFt: 33.734375, slabEstimate: 1, seams: 1 }]);
     expect(q.warnings).toEqual([]);
   });
 
