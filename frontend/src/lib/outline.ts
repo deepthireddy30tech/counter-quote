@@ -4,7 +4,14 @@ export type Leg = { length: number; depth: number; turn: number };
 
 export type SideName = 'back' | 'front' | 'start' | 'end';
 /** One edge of the outline, named by the leg side it belongs to (ADR 0003), never by edge number. */
+/** leg counts from 0 (leg 0 is "Leg 1" in messages). */
 export type Side = { leg: number; side: SideName; length: number };
+
+const MIN_TURN = 45;
+const MAX_TURN = 175;
+const PRECISION = 1e9; // round results to a billionth of an inch, far below the 1/8" measurements
+const MIN_FRONT = 0.01; // a front edge shorter than this means the corners used the leg up
+const CROSS_TOLERANCE = 1e-6;
 
 export type Outline = {
   /** Back (wall) corners: start of leg 1, each corner, end of the last leg. */
@@ -27,26 +34,29 @@ export type Outline = {
 export function counterOutline(legs: Leg[]): Outline {
   const sizeErrors = checkSizes(legs);
   if (sizeErrors.length) return { back: [], front: [], area: 0, sides: [], errors: sizeErrors };
-  let heading = 0;
+  let facing = 0;
   let at: Point = { x: 0, y: 0 };
   const back = [at];
   const dirs: Point[] = [];
   legs.forEach((leg, i) => {
-    if (i > 0) heading += ((180 - leg.turn) * Math.PI) / 180; // turn toward the front
-    const dir = { x: Math.cos(heading), y: Math.sin(heading) };
+    if (i > 0) facing += ((180 - leg.turn) * Math.PI) / 180; // always turns toward the front
+    const dir = { x: Math.cos(facing), y: Math.sin(facing) };
     dirs.push(dir);
     at = { x: at.x + dir.x * leg.length, y: at.y + dir.y * leg.length };
     back.push(at);
   });
   // front edge of leg i: its back edge moved toward the room by the depth
-  const frontLine = (i: number) => ({ from: plus(back[i], inward(dirs[i]), legs[i].depth), dir: dirs[i] });
+  const toFront = (p: Point, i: number) => plus(p, inward(dirs[i]), legs[i].depth);
+  const frontLine = (i: number) => ({ from: toFront(back[i], i), dir: dirs[i] });
   const n = legs.length;
   const front = [frontLine(0).from];
   for (let i = 0; i < n - 1; i++) front.push(meet(frontLine(i), frontLine(i + 1)));
-  front.push(plus(back[n], inward(dirs[n - 1]), legs[n - 1].depth));
-  // a front edge that runs backwards means the leg is used up by the corner
+  front.push(toFront(back[n], n - 1));
+  // a front edge that runs backwards means the corners used the leg up
   const errors = legs.flatMap((_, i) =>
-    dot(minus(front[i + 1], front[i]), dirs[i]) <= 0.01 ? [`Leg ${i + 1} is shorter than the depth it joins.`] : [],
+    dot(minus(front[i + 1], front[i]), dirs[i]) <= MIN_FRONT
+      ? [`Leg ${i + 1} is too short for its corners. Make it longer or the depth smaller.`]
+      : [],
   );
   const poly = [...back, ...[...front].reverse()];
   if (!errors.length && crossesItself(poly)) errors.push('Legs overlap. Check the lengths and turn angles.');
@@ -60,7 +70,7 @@ export function counterOutline(legs: Leg[]): Outline {
     back: back.map(tidy),
     front: front.map(tidy),
     area: shoelace(poly),
-    sides: sides.map((s) => ({ ...s, length: Math.round(s.length * 1e9) / 1e9 })),
+    sides: sides.map((s) => ({ ...s, length: round(s.length) })),
     errors,
   };
 }
@@ -69,10 +79,12 @@ function checkSizes(legs: Leg[]): string[] {
   if (!legs.length) return ['A counter needs at least one leg.'];
   return legs.flatMap((leg, i) => {
     const errors: string[] = [];
-    // !(x > 0) also catches NaN from an unreadable measurement
-    if (!(leg.length > 0)) errors.push(`Leg ${i + 1} length must be more than 0.`);
-    if (!(leg.depth > 0)) errors.push(`Leg ${i + 1} depth must be more than 0.`);
-    if (i > 0 && !(leg.turn >= 45 && leg.turn <= 175)) errors.push(`Leg ${i + 1} turn must be between 45° and 175°.`);
+    // isFinite also catches NaN from an unreadable measurement
+    const usable = (x: number) => Number.isFinite(x) && x > 0;
+    if (!usable(leg.length)) errors.push(`Leg ${i + 1} length must be more than 0.`);
+    if (!usable(leg.depth)) errors.push(`Leg ${i + 1} depth must be more than 0.`);
+    if (i > 0 && !(leg.turn >= MIN_TURN && leg.turn <= MAX_TURN))
+      errors.push(`Leg ${i + 1} turn must be between ${MIN_TURN}° and ${MAX_TURN}°.`);
     return errors;
   });
 }
@@ -86,8 +98,10 @@ function crossesItself(poly: Point[]): boolean {
       if (i === 0 && j === m - 1) continue; // first and last edges share a corner
       const [a, b] = edge(i);
       const [c, d] = edge(j);
-      const side = (p: Point, q: Point, r: Point) => cross(minus(q, p), minus(r, p));
-      if (side(a, b, c) * side(a, b, d) < -1e-6 && side(c, d, a) * side(c, d, b) < -1e-6) return true;
+      // which way r lies from the line p→q: opposite signs on both pairs means the edges cross
+      const orient = (p: Point, q: Point, r: Point) => cross(minus(q, p), minus(r, p));
+      if (orient(a, b, c) * orient(a, b, d) < -CROSS_TOLERANCE && orient(c, d, a) * orient(c, d, b) < -CROSS_TOLERANCE)
+        return true;
     }
   return false;
 }
@@ -105,5 +119,6 @@ const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 function shoelace(poly: Point[]): number {
   return Math.abs(poly.reduce((sum, p, i) => sum + cross(p, poly[(i + 1) % poly.length]), 0)) / 2;
 }
-// drop floating-point noise (cos 90° is 6e-17) far below the 1/8" measurements; + 0 turns -0 into 0
-const tidy = (p: Point): Point => ({ x: Math.round(p.x * 1e9) / 1e9 + 0, y: Math.round(p.y * 1e9) / 1e9 + 0 });
+// drop floating-point noise (cos 90° is 6e-17); + 0 turns -0 into 0
+const round = (v: number) => Math.round(v * PRECISION) / PRECISION + 0;
+const tidy = (p: Point): Point => ({ x: round(p.x), y: round(p.y) });

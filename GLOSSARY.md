@@ -113,6 +113,10 @@ _Avoid_: Measure, site survey
 Removing and disposing of the customer's old counters. Optional.
 _Avoid_: Demo, removal, rip-out
 
+**Additional requirement**:
+A free-text line the salesperson adds to a job, with its own price, for work the price list doesn't cover.
+_Avoid_: Extra, custom item, misc charge
+
 **Minimum job charge**:
 The lowest total a shop will accept; a smaller quote is raised to it with its own line item.
 _Avoid_: Minimum order, small job fee

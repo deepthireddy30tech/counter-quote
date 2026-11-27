@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { counterOutline } from './outline';
 
 describe('counterOutline: outline points', () => {
-  it('draws a straight counter as a rectangle, back edge along the wall', () => {
+  it('draws a straight counter with its back along the wall', () => {
     const o = counterOutline([{ length: 120, depth: 25.5, turn: 0 }]);
     expect(o.errors).toEqual([]);
     expect(o.back).toEqual([{ x: 0, y: 0 }, { x: 120, y: 0 }]);
@@ -76,6 +76,18 @@ describe('counterOutline: edge lengths per leg side', () => {
     expect(front[0]).toBeCloseTo(91.716, 3);
     expect(front[1]).toBeCloseTo(91.716, 3);
   });
+
+  // the deeper leg's front line meets leg 1's front 7.716" before leg 2's back starts, so its front
+  // edge is longer than its back: 100 + (36 × sin 45° − 20) / sin 45°
+  it("lengthens the deeper leg's front edge at an angled corner with mixed depths", () => {
+    const o = counterOutline([
+      { length: 100, depth: 20, turn: 0 },
+      { length: 100, depth: 36, turn: 135 },
+    ]);
+    const front = o.sides.filter((s) => s.side === 'front').map((s) => s.length);
+    expect(front[0]).toBeCloseTo(69.088, 3);
+    expect(front[1]).toBeCloseTo(107.716, 3);
+  });
 });
 
 describe('counterOutline: impossible shapes', () => {
@@ -86,9 +98,10 @@ describe('counterOutline: impossible shapes', () => {
     ['a zero length', [leg(0)], 'Leg 1 length must be more than 0.'],
     ['a negative depth', [leg(120, -1)], 'Leg 1 depth must be more than 0.'],
     ['an unreadable depth', [leg(120, NaN)], 'Leg 1 depth must be more than 0.'],
+    ['an endless length', [leg(Infinity)], 'Leg 1 length must be more than 0.'],
     ['a turn under 45°', [leg(120), leg(96, 25, 30)], 'Leg 2 turn must be between 45° and 175°.'],
     ['a turn over 175°', [leg(120), leg(96, 25, 180)], 'Leg 2 turn must be between 45° and 175°.'],
-    ['a leg shorter than the depth it joins', [leg(120), leg(20)], 'Leg 2 is shorter than the depth it joins.'],
+    ['a leg shorter than the depth it joins', [leg(120), leg(20)], 'Leg 2 is too short for its corners. Make it longer or the depth smaller.'],
     // a fourth leg running back across the first
     ['legs that overlap', [leg(100, 10), leg(100, 10), leg(100, 10), leg(120, 10)], 'Legs overlap. Check the lengths and turn angles.'],
   ])('stops the quote for %s', (_name, legs, error) => {
@@ -101,6 +114,10 @@ describe('counterOutline: impossible shapes', () => {
       'Leg 1 depth must be more than 0.',
       'Leg 2 turn must be between 45° and 175°.',
     ]);
+  });
+
+  it.each([45, 175])('accepts a turn of exactly %d°', (turn) => {
+    expect(counterOutline([leg(120), leg(96, 25, turn)]).errors).toEqual([]);
   });
 
   it('ignores the turn on the first leg', () => {
