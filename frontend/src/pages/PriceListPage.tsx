@@ -21,9 +21,12 @@ function NumberInput({ value, was, onChange, label, step = '0.01', unit = '$' }:
   const changed = value !== was;
   const before = was === undefined ? 'New' : `Was ${unit === '$' ? `$${was}` : `${was} ${unit}`}`;
   return (
-    <input type="number" min="0" step={step} className={changed ? 'number changed' : 'number'}
-      aria-label={changed ? `${label} (changed, ${before.toLowerCase()})` : label} title={changed ? before : undefined}
-      value={Number.isNaN(value) ? '' : value} onChange={(e) => onChange(e.target.valueAsNumber)} />
+    <>
+      <input type="number" min="0" step={step} className={changed ? 'number changed' : 'number'}
+        aria-label={changed ? `${label} (changed, ${before.toLowerCase()})` : label}
+        value={Number.isNaN(value) ? '' : value} onChange={(e) => onChange(e.target.valueAsNumber)} />
+      {changed && <span className="was" aria-hidden>{before}</span>}
+    </>
   );
 }
 
@@ -178,11 +181,12 @@ function PriceListForm({ saved }: { saved: PriceList }) {
               <td>
                 <select aria-label={`${m.name} price group`} value={m.priceGroupId}
                   className={wasMaterial(m.id)?.priceGroupId === m.priceGroupId ? undefined : 'changed'}
-                  title={wasMaterial(m.id) && wasMaterial(m.id)!.priceGroupId !== m.priceGroupId ? `Was ${groupName(wasMaterial(m.id)!.priceGroupId)}` : undefined}
                   onChange={(e) => change((d) => { d.materials[i].priceGroupId = Number(e.target.value); })}>
                   <option value={0}>Choose…</option>
                   {savedGroups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
                 </select>
+                {wasMaterial(m.id)?.priceGroupId !== m.priceGroupId &&
+                  <span className="was">{wasMaterial(m.id) ? `Was ${groupName(wasMaterial(m.id)!.priceGroupId)}` : 'New'}</span>}
               </td>
             )))}
           </tbody>

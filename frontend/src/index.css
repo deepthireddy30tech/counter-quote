@@ -31,3 +31,4 @@ ul.errors { margin: 8px 0; padding-left: 28px; }
 tr.removed td { background: #f7f7f7; }
 tr.removed input { text-decoration: line-through; color: #66727f; }
 .card table .changed { background: #fff4cc; border-color: #d9a400; box-shadow: 0 0 0 1px #d9a400; }
+.was { margin-left: 6px; font-size: 12px; color: #8a5a00; white-space: nowrap; }
