@@ -91,6 +91,16 @@ public class PriceListControllerTests : IDisposable
         Assert.IsType<BadRequestObjectResult>((await Save(list)).Result);
     }
 
+    [Fact]
+    public async Task A_price_list_with_no_edge_profiles_is_refused()
+    {
+        PriceList list = await Load();
+        list.EdgeProfiles.Clear();
+
+        Assert.IsType<BadRequestObjectResult>((await Save(list)).Result);
+        Assert.Equal(6, (await Load()).EdgeProfiles.Count);
+    }
+
     [Theory]
     [InlineData("material")]
     [InlineData("edge profile")]

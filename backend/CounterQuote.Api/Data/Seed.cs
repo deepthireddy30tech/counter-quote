@@ -2,7 +2,7 @@ using CounterQuote.Api.Models;
 
 namespace CounterQuote.Api.Data;
 
-/// <summary>Starting price list (docs/research/pricing.md summary table) and one sample job. Each runs only on an empty table.</summary>
+/// <summary>Starting price list (docs/research/pricing.md summary table) and one sample job, added only to a new database.</summary>
 public static class Seed
 {
     // 3 cm $/sq ft for groups 1–5; 2 cm is $10 less
@@ -39,7 +39,9 @@ public static class Seed
 
     public static void Run(AppDbContext db)
     {
-        if (!db.PriceGroups.Any())
+        // after this the price list belongs to the shop: the sample job must not need any row of it
+        bool newDatabase = !db.PriceGroups.Any();
+        if (newDatabase)
         {
             var groups = Groups.SelectMany(g => g.Rates.Select((rate, i) => new PriceGroup
             {
@@ -58,7 +60,7 @@ public static class Seed
         db.Jobs.RemoveRange(db.Jobs.Where(j => (j.CustomerName == "Sample: Kitchen" || j.CustomerName == "Sample: Bathroom") && !j.Counters.Any()));
         db.SaveChanges();
 
-        if (!db.Jobs.Any())
+        if (newDatabase && !db.Jobs.Any())
         {
             int steelGrey = db.Materials.Single(m => m.Name == "Steel Grey").Id;
             int eased = db.EdgeProfiles.Single(e => e.Name == "Eased").Id;
