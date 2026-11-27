@@ -1,6 +1,6 @@
 import type { Leg } from '../api';
 import { formatMeasurement, type Unit } from '../lib/measure';
-import { type CornerKey, planDrawing, profilePath } from '../lib/plan';
+import { type CornerKey, planDrawing, profilePath, SIDE_NAMES } from '../lib/plan';
 import type { SideName } from '../lib/outline';
 
 const W = 640;
@@ -39,7 +39,7 @@ export function PlanView({ legs, unit, edgeName, onToggleEdge, onToggleCorner }:
             {/* a wide invisible line, so the edge is easy to hit */}
             <line x1={e.a.x} y1={e.a.y} x2={e.b.x} y2={e.b.y} stroke="transparent" strokeWidth="16" className="hit"
               onClick={() => onToggleEdge(e.leg, e.side)}>
-              <title>{`Leg ${e.leg + 1} ${e.side}: ${e.covered ? 'covered' : 'exposed'}`}</title>
+              <title>{`Leg ${e.leg + 1} ${SIDE_NAMES[e.side]}: ${e.covered ? 'covered' : 'exposed'}`}</title>
             </line>
           </g>
         ))}
@@ -47,7 +47,7 @@ export function PlanView({ legs, unit, edgeName, onToggleEdge, onToggleCorner }:
         {plan.corners.filter((c) => c.available).map((c) => (
           <circle key={c.key} cx={c.at.x} cy={c.at.y} r="8" className="hit" fill={c.on ? EXPOSED : '#fff'} stroke={EXPOSED} strokeWidth="2"
             onClick={() => onToggleCorner(c.leg, c.key)}>
-            <title>{c.on ? 'Rounded corner' : 'Square corner'}</title>
+            <title>{c.on ? 'Radius corner' : 'Square corner'}</title>
           </circle>
         ))}
         {plan.dimensions.map((d, i) => (
@@ -65,7 +65,7 @@ export function PlanView({ legs, unit, edgeName, onToggleEdge, onToggleCorner }:
         <li><span style={{ background: EXPOSED }} />Exposed edge</li>
         <li><span style={{ background: COVERED }} />Covered edge</li>
         <li><span style={{ background: DIMENSION }} />Dimension</li>
-        <li>Click an edge to switch it, or a corner dot to round it.</li>
+        <li>Click an edge to switch it, or a corner dot to make it a radius corner.</li>
       </ul>
     </>
   );

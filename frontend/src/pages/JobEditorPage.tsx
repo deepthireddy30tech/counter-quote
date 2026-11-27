@@ -1,22 +1,26 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { type Counter, createJob, getJob, getPriceList, type Job, type Leg, type PriceList, updateJob } from '../api';
 import { useLeaveWarning } from '../hooks/useLeaveWarning';
 import {
-  layoutOf, newCounter, newLeg, quoteValidDays, ROOMS, sampleJob, toQuoteJob, toQuotePrices, withLayout, withRoom, withSavedQuote,
+  type Layout, LAYOUTS, layoutOf, newCounter, quoteValidDays, ROOMS, sampleJob, toQuoteJob, toQuotePrices, withLayout, withLegAdded, withRoom,
+  withSavedQuote,
 } from '../lib/jobEditor';
 import { formatMeasurement, parseMeasurement, type Unit } from '../lib/measure';
 import type { SideName } from '../lib/outline';
 import { CUTOUTS, type CutoutKind, priceJob, type Room } from '../lib/quote';
-import { PlanView } from './PlanView';
+import { PlanView } from '../components/PlanView';
+import { canRadius, SIDE_NAMES } from '../lib/plan';
 
 /** /jobs/new opens a sample Kitchen L; /jobs/:id opens the saved job. */
 export function JobEditorPage() {
-  const id = Number(useParams().id ?? 0);
+  const param = useParams().id;
+  const id = param === undefined ? 0 : Number(param);
   const prices = useQuery({ queryKey: ['priceList'], queryFn: getPriceList, refetchOnWindowFocus: false });
   const job = useQuery({ queryKey: ['jobs', id], queryFn: () => getJob(id), enabled: id > 0, refetchOnWindowFocus: false });
 
+  if (!(id >= 0 && Number.isInteger(id))) return <p className="errors">There is no job {param}.</p>;
   const error = prices.error ?? job.error;
   if (error) return <p className="errors">{error.message}</p>;
   if (!prices.data || (id > 0 && !job.data)) return <p>Loading…</p>;
@@ -27,9 +31,9 @@ export function JobEditorPage() {
 
 const SIDES: SideName[] = ['back', 'front', 'start', 'end'];
 const CORNERS = [
-  ['startBackRadius', 'Start back'], ['startFrontRadius', 'Start front'], ['endBackRadius', 'End back'], ['endFrontRadius', 'End front'],
+  ['startBackRadius', 'Back corner at the start end'], ['startFrontRadius', 'Front corner at the start end'],
+  ['endBackRadius', 'Back corner at the finish end'], ['endFrontRadius', 'Front corner at the finish end'],
 ] as const;
-const LAYOUT_NAMES = { Straight: 'Straight', L: 'L-shape', U: 'U-shape', Custom: 'Custom' } as const;
 
 function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
   const queryClient = useQueryClient();
@@ -38,7 +42,8 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
   const [job, setJob] = useState<Job>(structuredClone(saved));
   const [tab, setTab] = useState(0);
   const [unit, setUnit] = useState<Unit>('in');
-  const [justSaved, setJustSaved] = useState(false);
+  // a new job's first save moves to its own address, which opens a fresh editor that still says it saved
+  const [justSaved, setJustSaved] = useState<boolean>(useLocation().state?.justSaved ?? false);
   const [blankSizes, setBlankSizes] = useState(false);
 
   const quotePrices = useMemo(() => toQuotePrices(prices), [prices]);
@@ -58,7 +63,7 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
   });
   // a new job moves to its own address once saved (after the render that clears "unsaved", so nothing blocks it)
   useEffect(() => {
-    if (saved.id === 0 && stored.id > 0) navigate(`/jobs/${stored.id}`, { replace: true });
+    if (saved.id === 0 && stored.id > 0) navigate(`/jobs/${stored.id}`, { replace: true, state: { justSaved: true } });
   }, [saved.id, stored.id, navigate]);
 
   const change = (edit: (draft: Job) => void) => {
@@ -97,7 +102,7 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
     setTab(Math.max(0, tab - 1));
   };
   const cutouts = counter.legs.flatMap((l, leg) => l.cutouts.map((c, i) => ({ ...c, leg, i })));
-  const sideLabel = (leg: number, side: SideName) => (counter.legs.length > 1 || side === 'back' || side === 'front' ? `Leg ${leg + 1} ${side}` : side);
+  const sideLabel = (leg: number, side: SideName) => `Leg ${leg + 1} ${SIDE_NAMES[side]}`;
 
   return (
     <form onSubmit={handleSubmit} className="editor-page">
@@ -112,7 +117,7 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
       </div>
       {blankSizes && <p className="errors">Some sizes are empty or can't be read. Fix the boxes marked in red, then save.</p>}
       {save.error && <p className="errors">{save.error.message}</p>}
-      {justSaved && <p className="saved">Saved. The quote is kept as priced today{stored.validUntil && `, valid until ${new Date(stored.validUntil).toLocaleDateString()}`}.</p>}
+      {justSaved && <p className="saved">{stored.validUntil ? `Saved. The quote is kept as priced today, valid until ${new Date(stored.validUntil).toLocaleDateString()}.` : 'Saved without a price. Fix the Checks to price it.'}</p>}
 
       <div className="tabs" role="tablist">
         {names.map((n, i) => (
@@ -134,8 +139,8 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
               </select>
             </label>
             <label>Layout
-              <select value={layout} onChange={(e) => editCounter((c) => withLayout(c, e.target.value as 'Straight' | 'L' | 'U'))}>
-                {(['Straight', 'L', 'U'] as const).map((l) => <option key={l} value={l}>{LAYOUT_NAMES[l]}</option>)}
+              <select value={layout} onChange={(e) => editCounter((c) => withLayout(c, e.target.value as Layout))}>
+                {(Object.keys(LAYOUTS) as Layout[]).map((l) => <option key={l} value={l}>{LAYOUTS[l].name}</option>)}
                 {layout === 'Custom' && <option value="Custom" disabled>Custom</option>}
               </select>
             </label>
@@ -176,15 +181,18 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
                     onChange={(e) => editLeg(i, (x) => { x.turnAngle = e.target.valueAsNumber; })} />
                 </label>
               )}
-              <MeasureInput label={`Leg ${i + 1} length`} inches={l.length} unit={unit} onChange={(n) => editLeg(i, (x) => { x.length = n; })} />
-              <MeasureInput label={`Leg ${i + 1} depth`} inches={l.depth} unit={unit} onChange={(n) => editLeg(i, (x) => { x.depth = n; })} />
+              <MeasureInput name="Length" label={`Leg ${i + 1} length`} inches={l.length} unit={unit} onChange={(n) => editLeg(i, (x) => { x.length = n; })} />
+              <MeasureInput name="Depth" label={`Leg ${i + 1} depth`} inches={l.depth} unit={unit} onChange={(n) => editLeg(i, (x) => { x.depth = n; })} />
               {counter.legs.length > 1 && (
-                <button type="button" className="link" onClick={() => editCounter((c) => { c.legs.splice(i, 1); })}>Remove leg {i + 1}</button>
+                <button type="button" className="link" onClick={() => {
+                  if (l.cutouts.length && !window.confirm(`Remove leg ${i + 1} and its cutouts?`)) return;
+                  editCounter((c) => { c.legs.splice(i, 1); });
+                }}>Remove leg {i + 1}</button>
               )}
             </fieldset>
           ))}
           <p className="muted">Type 10′ 6″, 126, 23 1/2 or 3.2 m.</p>
-          <button type="button" className="link" onClick={() => editCounter((c) => { c.legs.push(newLeg(c.room, 96, c.legs[c.legs.length - 1].depth)); })}>+ Add leg</button>
+          <button type="button" className="link" onClick={() => editCounter(withLegAdded)}>+ Add leg</button>
 
           <h3>Cutouts</h3>
           {cutouts.length === 0 && <p className="muted">No sink or cooktop on this counter.</p>}
@@ -208,7 +216,7 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
                     </select>
                   </label>
                 )}
-                <MeasureInput label="Centerline from leg start" inches={c.centerline} unit={unit} onChange={(v) => edit((x) => { x.centerline = v; })} />
+                <MeasureInput name="Centerline" label={`${CUTOUTS[c.kind].name} ${n + 1} centerline from the leg's start end`} inches={c.centerline} unit={unit} onChange={(v) => edit((x) => { x.centerline = v; })} />
                 {c.kind !== 'cooktop' && (
                   <label>Faucet holes
                     <input type="number" className="number" min="0" max="5" value={c.faucetHoles}
@@ -233,10 +241,12 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
           )))}
           {CORNERS.map(([key, label]) => {
             const leg = key.startsWith('start') ? 0 : counter.legs.length - 1;
+            const possible = canRadius(counter.legs[leg], key);
             return (
-              <label key={key} className="check">
-                <input type="checkbox" checked={counter.legs[leg][key]} onChange={(e) => editLeg(leg, (x) => { x[key] = e.target.checked; })} />
-                {label} corner rounded
+              <label key={key} className={possible ? 'check' : 'check muted'}>
+                <input type="checkbox" disabled={!possible} checked={possible && counter.legs[leg][key]}
+                  onChange={(e) => editLeg(leg, (x) => { x[key] = e.target.checked; })} />
+                {label}: radius corner
               </label>
             );
           })}
@@ -285,7 +295,7 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
             <legend>Additional requirements</legend>
             {job.additionalRequirements.map((r, i) => (
               <div key={i} className="requirement">
-                <input aria-label={`Requirement ${i + 1}`} placeholder="e.g. Extra outlet cutout" maxLength={200} value={r.description}
+                <input aria-label={`Requirement ${i + 1}`} placeholder="e.g. Haul away the old sink" maxLength={200} value={r.description}
                   onChange={(e) => change((d) => { d.additionalRequirements[i].description = e.target.value; })} />
                 $ <input aria-label={`Requirement ${i + 1} price`} type="number" className="number" min="0" max="1000000" step="0.01"
                   value={Number.isNaN(r.price) ? '' : r.price}
@@ -307,14 +317,15 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
 const STEP = { in: 1, m: 1 / 2.54 }; // 1″, or 1 cm
 
 /** A size box that takes shop formats; it keeps what is typed and tidies it on leaving the box. A box that can't be read is NaN. */
-function MeasureInput({ label, inches, unit, onChange }: { label: string; inches: number; unit: Unit; onChange: (inches: number) => void }) {
+function MeasureInput({ name, label, inches, unit, onChange }:
+  { name: string; label: string; inches: number; unit: Unit; onChange: (inches: number) => void }) {
   const shown = Number.isNaN(inches) ? '' : formatMeasurement(inches, unit);
   const [text, setText] = useState(shown);
   const [typing, setTyping] = useState(false);
   useEffect(() => { if (!typing) setText(shown); }, [shown, typing]);
   const bump = (by: number) => onChange(Math.max(0.125, Math.round(((Number.isNaN(inches) ? 0 : inches) + by) * 8) / 8));
   return (
-    <label>{label.replace(/^Leg \d+ /, '').replace(/^./, (c) => c.toUpperCase())}
+    <label>{name}
       <span className="measure">
         <button type="button" aria-label={`${label} smaller`} onClick={() => bump(-STEP[unit])}>−</button>
         <input aria-label={label} value={text} aria-invalid={Number.isNaN(inches)} className={Number.isNaN(inches) ? 'bad' : undefined}

@@ -11,6 +11,9 @@ export type PlanCutout = { kind: CutoutKind; leg: number; center: Point; width: 
 export type PlanDimension = { at: Point; inches: number };
 export type Plan = { outline: Point[]; edges: PlanEdge[]; corners: PlanCorner[]; cutouts: PlanCutout[]; dimensions: PlanDimension[]; errors: string[] };
 
+/** Leg sides as the GLOSSARY names them. */
+export const SIDE_NAMES: Record<SideName, string> = { back: 'back', front: 'front', start: 'start end', end: 'finish end' };
+
 const LABEL_GAP = 16; // px between an edge and its dimension label
 
 /** The counter drawn to fit a width × height box in px, keeping its proportions (y runs toward the room). */
@@ -24,7 +27,6 @@ export function planDrawing(legs: SavedLeg[], width: number, height: number, mar
   const spanX = Math.max(...all.map((p) => p.x)) - minX;
   const spanY = Math.max(...all.map((p) => p.y)) - minY;
   const scale = Math.min((width - 2 * margin) / spanX, (height - 2 * margin) / spanY);
-  // centre the drawing in the box
   const offX = (width - spanX * scale) / 2;
   const offY = (height - spanY * scale) / 2;
   const px = (p: Point): Point => ({ x: offX + (p.x - minX) * scale, y: offY + (p.y - minY) * scale });
@@ -43,14 +45,12 @@ export function planDrawing(legs: SavedLeg[], width: number, height: number, mar
     return { leg, side, a, b, inches: length, covered: legs[leg][`${side}Covered`] };
   });
 
-  const corner = (leg: number, key: CornerKey, at: Point, end: 'start' | 'end', side: 'front' | 'back'): PlanCorner => ({
-    leg, key, at, on: legs[leg][key], available: !legs[leg][`${end}Covered`] && !legs[leg][`${side}Covered`],
-  });
+  const corner = (leg: number, key: CornerKey, at: Point): PlanCorner => ({ leg, key, at, on: legs[leg][key], available: canRadius(legs[leg], key) });
   const corners = [
-    corner(0, 'startBackRadius', back[0], 'start', 'back'),
-    corner(0, 'startFrontRadius', front[0], 'start', 'front'),
-    corner(n - 1, 'endBackRadius', back[n], 'end', 'back'),
-    corner(n - 1, 'endFrontRadius', front[n], 'end', 'front'),
+    corner(0, 'startBackRadius', back[0]),
+    corner(0, 'startFrontRadius', front[0]),
+    corner(n - 1, 'endBackRadius', back[n]),
+    corner(n - 1, 'endFrontRadius', front[n]),
   ];
 
   const cutouts = legs.flatMap((l, i) => {
@@ -68,7 +68,6 @@ export function planDrawing(legs: SavedLeg[], width: number, height: number, mar
     });
   });
 
-  // each leg's back length outside the wall side, and the depth beside the start
   const outside = (a: Point, b: Point, away: Point): Point => {
     const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
     return { x: mid.x + away.x * LABEL_GAP, y: mid.y + away.y * LABEL_GAP };
@@ -83,12 +82,20 @@ export function planDrawing(legs: SavedLeg[], width: number, height: number, mar
   return { outline: [...back, ...[...front].reverse()], edges, corners, cutouts, dimensions, errors: shape.errors };
 }
 
+/** A corner can only be a radius corner when both edges that meet there are exposed. */
+export function canRadius(leg: SavedLeg, key: CornerKey): boolean {
+  const end = key.startsWith('start') ? 'start' : 'end';
+  const side = key.includes('Front') ? 'front' : 'back';
+  return !leg[`${end}Covered`] && !leg[`${side}Covered`];
+}
+
 function unit(a: Point, b: Point): Point {
   const len = Math.hypot(b.x - a.x, b.y - a.y);
   return { x: (b.x - a.x) / len, y: (b.y - a.y) / len };
 }
 
 /** A small cross-section of the edge profile, 60 wide with the polished edge on the right. */
+// shortcut: picks the drawing from words in the profile's name, so a renamed profile draws as eased; store a shape per profile if shops rename them
 export function profilePath(name: string): string {
   const n = name.toLowerCase();
   if (n.includes('bevel')) return 'M0 0 H54 L60 6 V20 H0 Z';

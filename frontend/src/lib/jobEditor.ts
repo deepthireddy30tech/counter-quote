@@ -2,8 +2,9 @@ import type { Counter as SavedCounter, Job as SavedJob, Leg as SavedLeg, PriceLi
 import type { Counter, FeeKind, Job, PriceList, Quote, Room } from './quote';
 
 export const ROOMS: Room[] = ['Kitchen', 'Island', 'Bathroom', 'Other'];
-export type Layout = 'Straight' | 'L' | 'U' | 'Custom';
-const LEGS_IN: Record<Exclude<Layout, 'Custom'>, number> = { Straight: 1, L: 2, U: 3 };
+/** The layouts a counter can be set to, by number of legs. Angled corners or more legs make it Custom. */
+export const LAYOUTS = { Straight: { legs: 1, name: 'Straight' }, L: { legs: 2, name: 'L-shape' }, U: { legs: 3, name: 'U-shape' } } as const;
+export type Layout = keyof typeof LAYOUTS;
 const NEW_LEG_LENGTH = 96;
 
 /** A room's starting depth and covered edges; an island starts with every edge exposed. */
@@ -77,18 +78,22 @@ export function sampleJob(materialId: number, edgeProfileId: number): SavedJob {
 }
 
 /** Straight, L or U when the legs match one (square corners); anything else is Custom. */
-export function layoutOf(counter: SavedCounter): Layout {
+export function layoutOf(counter: SavedCounter): Layout | 'Custom' {
   const square = counter.legs.every((l, i) => i === 0 || l.turnAngle === 90);
-  const n = counter.legs.length;
-  return !square || n > 3 ? 'Custom' : n === 1 ? 'Straight' : n === 2 ? 'L' : 'U';
+  const match = (Object.keys(LAYOUTS) as Layout[]).find((k) => LAYOUTS[k].legs === counter.legs.length);
+  return square && match ? match : 'Custom';
 }
 
 /** Keeps the first legs, squares their corners, and adds legs as deep as the last one. */
-export function withLayout(counter: SavedCounter, layout: Exclude<Layout, 'Custom'>): SavedCounter {
-  const n = LEGS_IN[layout];
-  const legs = counter.legs.slice(0, n).map((l, i) => (i === 0 ? l : { ...l, turnAngle: 90 }));
-  while (legs.length < n) legs.push(newLeg(counter.room, NEW_LEG_LENGTH, legs[legs.length - 1].depth));
-  return { ...counter, legs };
+export function withLayout(counter: SavedCounter, layout: Layout): SavedCounter {
+  let next = { ...counter, legs: counter.legs.slice(0, LAYOUTS[layout].legs).map((l, i) => (i === 0 ? l : { ...l, turnAngle: 90 })) };
+  while (next.legs.length < LAYOUTS[layout].legs) next = withLegAdded(next);
+  return next;
+}
+
+/** A new square leg on the end, as deep as the last one. */
+export function withLegAdded(counter: SavedCounter): SavedCounter {
+  return { ...counter, legs: [...counter.legs, newLeg(counter.room, NEW_LEG_LENGTH, counter.legs[counter.legs.length - 1].depth)] };
 }
 
 /** A new room resets every leg's depth and covered edges to that room's starting values. */
@@ -101,7 +106,7 @@ export function withRoom(counter: SavedCounter, room: Room): SavedCounter {
   };
 }
 
-/** The job with today's quote attached, ready to save (ADR 0002). */
+/** The job with today's quote attached, ready to save (ADR 0002). A job that can't be priced saves with no quote. */
 export function withSavedQuote(job: SavedJob, quote: Quote, validDays: number, now: Date): SavedJob {
   const validUntil = new Date(now);
   validUntil.setDate(validUntil.getDate() + validDays);
@@ -114,8 +119,8 @@ export function withSavedQuote(job: SavedJob, quote: Quote, validDays: number, n
       .map((r) => ({ description: r.description.trim(), price: r.price || 0 })),
     lineItems: quote.items,
     total: quote.total,
-    savedAt: now.toISOString(),
-    validUntil: validUntil.toISOString(),
+    savedAt: quote.total == null ? null : now.toISOString(),
+    validUntil: quote.total == null ? null : validUntil.toISOString(),
   };
 }
 

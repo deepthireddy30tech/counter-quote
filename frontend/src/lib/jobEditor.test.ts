@@ -79,4 +79,11 @@ describe('withSavedQuote', () => {
     expect(saved.additionalRequirements).toEqual([{ description: 'Outlet cutout', price: 0 }]);
     expect(saved.lineItems).toHaveLength(5);
   });
+
+  it('keeps no quote for a job that can’t be priced', () => {
+    const job = sampleJob(3, 5);
+    job.counters[0].legs[0].length = 10; // the sink no longer fits
+    const quote = priceJob(toQuoteJob(job), toQuotePrices(prices), 'in');
+    expect(withSavedQuote(job, quote, 30, new Date())).toMatchObject({ total: null, savedAt: null, validUntil: null, lineItems: [] });
+  });
 });
