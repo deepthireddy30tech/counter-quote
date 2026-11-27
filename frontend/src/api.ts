@@ -50,8 +50,6 @@ export interface Job {
   lineItems: QuoteLineItem[];
 }
 
-export type NewJob = Pick<Job, 'customerName'>;
-
 export interface PriceList {
   priceGroups: { id: number; name: string; rates: { thickness: Thickness; pricePerSqFt: number }[] }[];
   materials: { id: number; name: string; priceGroupId: number }[];
@@ -70,12 +68,13 @@ async function request<T>(path: string, method = 'GET', body?: unknown): Promise
     const reasons = problem?.errors ? Object.values(problem.errors).flat().join(' ') : '';
     throw new Error(reasons || problem?.title || `Request failed (${response.status})`);
   }
-  return response.json();
+  return response.status === 204 ? (undefined as T) : response.json();
 }
 
 export const getJobs = () => request<Job[]>('/api/jobs');
 export const getJob = (id: number) => request<Job>(`/api/jobs/${id}`);
-export const createJob = (job: NewJob) => request<Job>('/api/jobs', 'POST', job);
+export const createJob = (job: Job) => request<Job>('/api/jobs', 'POST', job);
 export const updateJob = (job: Job) => request<Job>(`/api/jobs/${job.id}`, 'PUT', job);
+export const deleteJob = (id: number) => request<void>(`/api/jobs/${id}`, 'DELETE');
 export const getPriceList = () => request<PriceList>('/api/price-list');
 export const savePriceList = (list: PriceList) => request<PriceList>('/api/price-list', 'PUT', list);

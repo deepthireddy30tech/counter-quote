@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
-import { useBlocker } from 'react-router-dom';
+import { type FormEvent, type ReactNode, useState } from 'react';
 import { getPriceList, type PriceList, savePriceList } from '../api';
+import { useLeaveWarning } from '../hooks/useLeaveWarning';
 import { feeLabel, FEE_LABELS, isDays, priceListProblems } from '../lib/priceList';
 
 export function PriceListPage() {
@@ -33,22 +33,6 @@ function NumberInput({ value, was, onChange, label, step = '0.01', unit = '$' }:
 type Section = 'priceGroups' | 'materials' | 'edgeProfiles';
 type Row = { id: number; name: string };
 
-/** Warns before the page is left with unsaved changes: in-app links ask, closing the tab gets the browser's prompt. */
-function useLeaveWarning(unsaved: boolean) {
-  const blocker = useBlocker(unsaved);
-  useEffect(() => {
-    if (blocker.state !== 'blocked') return;
-    if (window.confirm('Leave without saving? Your price list changes will be lost.')) blocker.proceed();
-    else blocker.reset();
-  }, [blocker]);
-  useEffect(() => {
-    if (!unsaved) return;
-    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
-    window.addEventListener('beforeunload', warn);
-    return () => window.removeEventListener('beforeunload', warn);
-  }, [unsaved]);
-}
-
 function PriceListForm({ saved }: { saved: PriceList }) {
   const queryClient = useQueryClient();
   const [stored, setStored] = useState(saved);
@@ -66,7 +50,7 @@ function PriceListForm({ saved }: { saved: PriceList }) {
     edgeProfiles: list.edgeProfiles.filter((e) => !isRemoved('edgeProfiles', e)),
   };
   const unsaved = removed.size > 0 || JSON.stringify(list) !== JSON.stringify(stored);
-  useLeaveWarning(unsaved);
+  useLeaveWarning(unsaved, 'Leave without saving? Your price list changes will be lost.');
 
   const save = useMutation({
     mutationFn: savePriceList,
