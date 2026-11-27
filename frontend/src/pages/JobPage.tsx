@@ -12,7 +12,7 @@ export function JobPage() {
   return (
     <>
       <h1>{job.customerName}</h1>
-      <p className="muted">{job.material}</p>
+      <p className="muted">{job.counters.map((c) => c.room).join(', ') || 'No counters yet'}</p>
       <section className="card">
         <p className="muted">Your drawing and price go here.</p>
       </section>

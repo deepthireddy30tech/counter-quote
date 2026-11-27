@@ -1,5 +1,4 @@
 using CounterQuote.Api.Data;
-using CounterQuote.Api.Models;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -20,13 +19,7 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
 
-    if (!db.Jobs.Any())
-    {
-        db.Jobs.AddRange(
-            new Job { CustomerName = "Sample: Kitchen", Material = "Granite", CreatedDate = DateTime.UtcNow },
-            new Job { CustomerName = "Sample: Bathroom", Material = "Quartz", CreatedDate = DateTime.UtcNow });
-        db.SaveChanges();
-    }
+    Seed.Run(db);
 }
 
 app.UseSwagger();

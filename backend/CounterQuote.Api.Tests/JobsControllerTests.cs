@@ -1,6 +1,7 @@
 using CounterQuote.Api.Controllers;
 using CounterQuote.Api.Data;
 using CounterQuote.Api.Models;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,43 +10,143 @@ namespace CounterQuote.Api.Tests;
 public class JobsControllerTests : IDisposable
 {
     private readonly SqliteConnection _connection = new("Data Source=:memory:");
+    private readonly int _steelGrey;
+    private readonly int _ogee;
 
     public JobsControllerTests()
     {
         _connection.Open();
         using AppDbContext db = CreateDb();
         db.Database.Migrate();
+        Seed.Run(db);
+        db.Jobs.RemoveRange(db.Jobs); // start without the sample job
+        db.SaveChanges();
+        _steelGrey = db.Materials.Single(m => m.Name == "Steel Grey").Id;
+        _ogee = db.EdgeProfiles.Single(e => e.Name == "Ogee").Id;
     }
 
     public void Dispose() => _connection.Dispose();
 
     private AppDbContext CreateDb() => new(new DbContextOptionsBuilder<AppDbContext>().UseSqlite(_connection).Options);
 
-    [Fact]
-    public async Task Created_job_can_be_read_back()
+    private Job KitchenL(string customer = "Rivera") => new()
     {
-        using (AppDbContext db = CreateDb())
-            await new JobsController(db).Create(new Job { CustomerName = "Rivera", Material = "Quartz" });
+        CustomerName = customer,
+        TearOut = true,
+        Counters =
+        [
+            new()
+            {
+                Room = "Kitchen", MaterialId = _steelGrey, Thickness = 3, EdgeProfileId = _ogee, Backsplash = true,
+                Legs =
+                [
+                    new() { Length = 120, Depth = 25.5, BackCovered = true, Cutouts = [new() { Kind = "undermount", Centerline = 60, FaucetHoles = 3 }] },
+                    new() { Length = 96, Depth = 25.5, TurnAngle = 90, BackCovered = true, EndFrontRadius = true },
+                ],
+            },
+            new() { Room = "Island", MaterialId = _steelGrey, Thickness = 3, EdgeProfileId = _ogee, Legs = [new() { Length = 72, Depth = 36 }] },
+        ],
+        AdditionalRequirements = [new() { Description = "Haul away", Price = 45 }],
+        Total = 3303.60m,
+        LineItems =
+        [
+            new() { Counter = "Kitchen L", Description = "Steel Grey, 3 cm", Quantity = 34, Unit = "sq ft", Rate = 58, Amount = 1972 },
+            new() { Counter = "Job", Description = "Templating visit", Quantity = 1, Unit = "job", Rate = 150, Amount = 150 },
+        ],
+    };
 
-        using AppDbContext readDb = CreateDb();
-        Job job = Assert.Single(await new JobsController(readDb).GetAll());
-        Assert.Equal("Rivera", job.CustomerName);
-        Assert.Equal("Quartz", job.Material);
+    private async Task<int> Create(Job job)
+    {
+        using AppDbContext db = CreateDb();
+        var result = await new JobsController(db).Create(job);
+        return ((Job)((CreatedAtActionResult)result.Result!).Value!).Id;
+    }
+
+    private async Task<Job> Read(int id)
+    {
+        using AppDbContext db = CreateDb();
+        return (await new JobsController(db).Get(id)).Value!;
     }
 
     [Fact]
-    public async Task Updating_a_job_saves_the_changes_and_keeps_its_created_date()
+    public async Task A_job_reads_back_with_its_counters_legs_cutouts_and_saved_quote_in_order()
+    {
+        Job job = await Read(await Create(KitchenL()));
+
+        Assert.True(job.TearOut);
+        Assert.Equal(["Kitchen", "Island"], job.Counters.Select(c => c.Room));
+        Counter kitchen = job.Counters[0];
+        Assert.Equal([120.0, 96.0], kitchen.Legs.Select(l => l.Length));
+        Assert.True(kitchen.Legs[1].EndFrontRadius);
+        Cutout sink = Assert.Single(kitchen.Legs[0].Cutouts);
+        Assert.Equal(("undermount", 60.0, 3), (sink.Kind, sink.Centerline, sink.FaucetHoles));
+        Assert.Empty(kitchen.Legs[1].Cutouts);
+        Assert.Equal("Haul away", Assert.Single(job.AdditionalRequirements).Description);
+        Assert.Equal(["Kitchen L", "Job"], job.LineItems.Select(i => i.Counter));
+        Assert.Equal(3303.60m, job.Total);
+    }
+
+    [Fact]
+    public async Task Updating_replaces_every_child_row_and_keeps_the_created_date()
+    {
+        int id = await Create(KitchenL());
+        DateTime created = (await Read(id)).CreatedDate;
+
+        Job changes = KitchenL("Rivera Jr");
+        changes.Counters.RemoveAt(1);
+        changes.Counters[0].Legs.RemoveAt(1);
+        changes.Counters[0].Legs[0].Cutouts[0].Kind = "farmhouse";
+        changes.AdditionalRequirements.Clear();
+        changes.LineItems.RemoveAt(0);
+        using (AppDbContext db = CreateDb())
+            await new JobsController(db).Update(id, changes);
+
+        Job job = await Read(id);
+        Assert.Equal("Rivera Jr", job.CustomerName);
+        Assert.Equal(created, job.CreatedDate);
+        Assert.Equal("farmhouse", Assert.Single(Assert.Single(Assert.Single(job.Counters).Legs).Cutouts).Kind);
+        Assert.Empty(job.AdditionalRequirements);
+        Assert.Single(job.LineItems);
+        using AppDbContext check = CreateDb();
+        Assert.Equal((1, 1, 1), (check.Counters.Count(), check.Legs.Count(), check.Cutouts.Count()));
+    }
+
+    [Fact]
+    public async Task Deleting_a_job_deletes_its_child_rows()
+    {
+        int id = await Create(KitchenL());
+        await Create(KitchenL("Keep me"));
+
+        using (AppDbContext db = CreateDb())
+            Assert.IsType<NoContentResult>(await new JobsController(db).Delete(id));
+
+        using AppDbContext check = CreateDb();
+        Assert.Equal("Keep me", Assert.Single(check.Jobs).CustomerName);
+        Assert.Equal((2, 3, 1, 1, 2), (check.Counters.Count(), check.Legs.Count(), check.Cutouts.Count(),
+            check.AdditionalRequirements.Count(), check.QuoteLineItems.Count()));
+    }
+
+    [Fact]
+    public async Task A_counter_whose_material_is_not_in_the_price_list_is_refused()
+    {
+        Job job = KitchenL();
+        job.Counters[1].MaterialId = 9999;
+        using AppDbContext db = CreateDb();
+
+        var result = await new JobsController(db).Create(job);
+
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.Empty(db.Jobs);
+    }
+
+    [Fact]
+    public void The_seed_adds_one_sample_job_only_once()
     {
         using AppDbContext db = CreateDb();
-        db.Jobs.Add(new Job { CustomerName = "Rivera", Material = "Quartz", CreatedDate = new DateTime(2026, 1, 2) });
-        db.SaveChanges();
-        int id = db.Jobs.Single().Id;
+        Seed.Run(db);
+        Seed.Run(db);
 
-        await new JobsController(db).Update(id, new Job { CustomerName = "Rivera", Material = "Marble" });
-
-        using AppDbContext readDb = CreateDb();
-        Job job = readDb.Jobs.Single();
-        Assert.Equal("Marble", job.Material);
-        Assert.Equal(new DateTime(2026, 1, 2), job.CreatedDate);
+        Job sample = db.Jobs.Include(j => j.Counters).ThenInclude(c => c.Legs).Single();
+        Assert.Equal([2, 1], sample.Counters.OrderBy(c => c.Position).Select(c => c.Legs.Count));
     }
 }
