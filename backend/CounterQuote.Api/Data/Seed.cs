@@ -33,7 +33,7 @@ public static class Seed
     private static readonly (string Kind, decimal Amount)[] Fees =
     [
         ("undermount", 250), ("dropin", 100), ("farmhouse", 200), ("cooktop", 150), ("faucetHole", 25),
-        ("radiusCorner", 12), ("backsplash", 20), ("seam", 0), ("templating", 150), ("tearOut", 400),
+        ("radiusCorner", 12), ("backsplash", 20), ("seam", 0), ("templating", 0), ("tearOut", 400),
         ("minimum", 800), ("quoteValidDays", 30),
     ];
 
