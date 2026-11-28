@@ -59,7 +59,8 @@ label.check { display: flex; gap: 6px; align-items: center; margin: 4px 0; }
 .plan-empty { padding: 80px 0; text-align: center; }
 .legend { display: flex; flex-wrap: wrap; gap: 12px; list-style: none; padding: 0; font-size: 12px; }
 .legend span { display: inline-block; width: 14px; height: 4px; margin-right: 4px; vertical-align: middle; }
-.warnings { color: #8a5a00; background: #fff4cc; border: 1px solid #ecd27a; border-radius: 4px; padding: 8px 8px 8px 28px; }
+.warnings { color: #8a5a00; background: #fff4cc; border: 1px solid #ecd27a; border-radius: 4px; padding: 8px; }
+ul.warnings { margin: 8px 0; padding-left: 28px; }
 .quote td { vertical-align: top; }
 .quote .group { display: block; margin-top: 4px; }
 .quote .amount { text-align: right; white-space: nowrap; }
