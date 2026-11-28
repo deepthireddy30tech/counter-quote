@@ -54,7 +54,7 @@ export type CounterSummary = { name: string; areaSqFt: number; slabEstimate: num
 export type Quote = { items: LineItem[]; total: number | null; counters: CounterSummary[]; errors: string[]; warnings: string[] };
 
 /** Width along the leg and depth front to back, in inches. */
-const CUTOUTS: Record<CutoutKind, { name: string; width: number; depth: number }> = {
+export const CUTOUTS: Record<CutoutKind, { name: string; width: number; depth: number }> = {
   undermount: { name: 'Undermount sink', width: 30, depth: 16 },
   dropin: { name: 'Drop-in sink', width: 33, depth: 19 },
   farmhouse: { name: 'Farmhouse sink', width: 33, depth: 19 },

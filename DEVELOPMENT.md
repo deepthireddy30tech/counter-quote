@@ -15,6 +15,8 @@ backend/CounterQuote.Api.Tests/   xUnit tests on an in-memory SQLite database
 frontend/src/
   api.ts         types and calls to the API
   pages/         one file per screen
+  components/    parts a screen is built from (the counter plan)
+  hooks/         React hooks shared by screens
   lib/           pure logic (measurements, geometry, pricing) with Vitest tests next to it
   main.tsx       routes
 data/app.db      the database, created on first run

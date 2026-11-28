@@ -32,3 +32,43 @@ tr.removed td { background: #f7f7f7; }
 tr.removed input { text-decoration: line-through; color: #66727f; }
 .card table .changed { background: #fff4cc; border-color: #d9a400; box-shadow: 0 0 0 1px #d9a400; }
 .was { margin-left: 6px; font-size: 12px; color: #8a5a00; white-space: nowrap; }
+main:has(.editor-page) { max-width: 1440px; }
+.editor { display: grid; grid-template-columns: 300px minmax(0, 1fr) 320px; gap: 12px; align-items: start; }
+@media (max-width: 1100px) { .editor { grid-template-columns: 1fr; } }
+.editor .card { margin: 0; }
+.editor h3 { font-size: 13px; margin: 16px 0 6px; }
+.customer { display: flex; gap: 8px; align-items: center; font-weight: 600; }
+.customer input, .editor input:not([type=checkbox]), .editor select { font: inherit; padding: 4px 6px; border: 1px solid #c4ccd4; border-radius: 4px; }
+.customer input { width: 18em; }
+.tabs { display: flex; gap: 4px; align-items: center; margin: 12px 0; flex-wrap: wrap; }
+.tab { font: inherit; padding: 6px 12px; border: 1px solid #c4ccd4; border-radius: 4px; background: #fff; cursor: pointer; }
+.tab.active { background: #22303d; color: #fff; border-color: #22303d; }
+.toggle { display: flex; }
+.toggle button { font: inherit; padding: 4px 10px; border: 1px solid #c4ccd4; background: #fff; cursor: pointer; }
+.toggle button[aria-pressed=true] { background: #1d5fa8; color: #fff; border-color: #1d5fa8; }
+fieldset.leg { border: 1px solid #e1e5ea; border-radius: 4px; margin: 8px 0; display: grid; gap: 6px; }
+fieldset.leg label { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.measure { display: flex; }
+.measure input { width: 7em; text-align: center; }
+.measure button { font: inherit; width: 28px; border: 1px solid #c4ccd4; background: #f4f5f7; cursor: pointer; }
+.editor input.bad { border-color: #a61b1b; background: #fdecec; }
+label.check { display: flex; gap: 6px; align-items: center; margin: 4px 0; }
+.danger { color: #a61b1b; }
+.plan { width: 100%; height: auto; }
+.plan .hit { cursor: pointer; }
+.plan-empty { padding: 80px 0; text-align: center; }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; list-style: none; padding: 0; font-size: 12px; }
+.legend span { display: inline-block; width: 14px; height: 4px; margin-right: 4px; vertical-align: middle; }
+.warnings { color: #8a5a00; background: #fff4cc; border: 1px solid #ecd27a; border-radius: 4px; padding: 8px 8px 8px 28px; }
+.quote td { vertical-align: top; }
+.quote .group { display: block; margin-top: 4px; }
+.quote .amount { text-align: right; white-space: nowrap; }
+.requirement { display: flex; gap: 4px; align-items: center; }
+.requirement input:not(.number) { flex: 1; min-width: 0; }
+.total { display: flex; justify-content: space-between; font-size: 16px; border-top: 1px solid #e1e5ea; padding-top: 8px; }
+/* the editor fits the window: each column scrolls on its own, so the plan and quote stay in view */
+@media (min-width: 1101px) {
+  .editor { height: calc(100vh - 190px); }
+  .editor > .card { max-height: 100%; overflow-y: auto; box-sizing: border-box; }
+}
+.editor summary { font-weight: 600; font-size: 13px; margin: 16px 0 6px; cursor: pointer; }

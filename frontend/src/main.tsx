@@ -2,9 +2,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, Link, Outlet, RouterProvider } from 'react-router-dom';
-import { JobPage } from './pages/JobPage';
+import { JobEditorPage } from './pages/JobEditorPage';
 import { JobsPage } from './pages/JobsPage';
-import { NewJobPage } from './pages/NewJobPage';
 import { PriceListPage } from './pages/PriceListPage';
 import './index.css';
 
@@ -31,8 +30,8 @@ const router = createBrowserRouter([
     element: <Layout />,
     children: [
       { path: '/', element: <JobsPage /> },
-      { path: '/jobs/new', element: <NewJobPage /> },
-      { path: '/jobs/:id', element: <JobPage /> },
+      { path: '/jobs/new', element: <JobEditorPage /> },
+      { path: '/jobs/:id', element: <JobEditorPage /> },
       { path: '/price-list', element: <PriceListPage /> },
     ],
   },
