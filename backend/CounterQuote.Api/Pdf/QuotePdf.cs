@@ -11,14 +11,15 @@ public static partial class QuotePdf
 {
     // shortcut: a placeholder shop; move it into the price list as shop details when a real shop uses this
     private const string ShopName = "Your Stone Shop";
-    private const string ShopAddress = "123 Main Street, Anytown  ·  (555) 555-0100";
+    private const string ShopContact = "123 Main Street, Anytown  ·  (555) 555-0100";
 
     // free for individuals and companies under $1M revenue; a bigger shop needs a paid QuestPDF licence
     static QuotePdf() => QuestPDF.Settings.License = LicenseType.Community;
 
     // the browser's plan drawing never needs links, scripts, images, styles or doctype; refusing them keeps the
-    // server from fetching or reading anything while it renders a drawing someone else sent
-    [GeneratedRegex(@"<!|<\?|href|<\s*(script|image|use|style|foreignObject)|url\(\s*(?!#)|@import", RegexOptions.IgnoreCase)]
+    // server from fetching or reading anything while it renders a drawing someone else sent. Text is escaped by
+    // React, so a name can't open a tag; only an odd edge name with "href=" or "url(" in it would be refused
+    [GeneratedRegex(@"<!|<\?|[\s:]href\s*=|<\s*(script|image|use|style|foreignObject|a)\b|url\(\s*(?!#)|@import", RegexOptions.IgnoreCase)]
     private static partial Regex Unsafe();
 
     public static bool IsSafeDrawing(string svg) => svg.StartsWith("<svg") && !Unsafe().IsMatch(svg);
@@ -35,7 +36,7 @@ public static partial class QuotePdf
             row.RelativeItem().Column(c =>
             {
                 c.Item().Text(ShopName).FontSize(16).Bold();
-                c.Item().Text(ShopAddress).FontColor(Colors.Grey.Darken1);
+                c.Item().Text(ShopContact).FontColor(Colors.Grey.Darken1);
             });
             row.ConstantItem(200).Column(c =>
             {

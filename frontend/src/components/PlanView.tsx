@@ -41,16 +41,17 @@ export function PlanView({ legs, unit, edgeName, onToggleEdge, onToggleCorner }:
 }
 
 const TITLE = 28; // room for a counter's name above its plan in the quote drawing
+const CELL_H = TITLE + H + 80;
 
 /** Every counter's plan in one SVG, two to a row, for the saved quote's PDF. Nothing in it is clickable. */
 export function QuoteDrawing({ counters, unit }: { counters: { name: string; legs: Leg[]; edgeName: string }[]; unit: Unit }) {
   const columns = Math.min(2, counters.length);
   const rows = Math.ceil(counters.length / 2);
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 ${W * columns} ${(TITLE + H + 80) * rows}`}>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 ${W * columns} ${CELL_H * rows}`}>
       {DEFS}
       {counters.map((c, i) => (
-        <g key={i} transform={`translate(${(i % 2) * W} ${Math.floor(i / 2) * (TITLE + H + 80)})`}>
+        <g key={i} transform={`translate(${(i % 2) * W} ${Math.floor(i / 2) * CELL_H})`}>
           <text x="12" y="20" fontSize="16" fontWeight="bold" fill="#1f2933">{c.name}</text>
           <g transform={`translate(0 ${TITLE})`}><PlanShapes legs={c.legs} unit={unit} edgeName={c.edgeName} /></g>
         </g>

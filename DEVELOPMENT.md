@@ -9,7 +9,8 @@ backend/CounterQuote.Api/
   Models/        what is stored; one class per table
   Data/          AppDbContext: one DbSet per table
   Migrations/    generated database changes; don't edit by hand
-  Controllers/   the API; returns the models directly
+  Controllers/   the API; returns the models directly, except the job's PDF
+  Pdf/           QuotePdf: the saved quote as a PDF (QuestPDF), and the check on the browser's plan drawing
   Program.cs     startup; applies migrations, then Data/Seed.cs adds the starting price list and a sample job to empty tables
 backend/CounterQuote.Api.Tests/   xUnit tests on an in-memory SQLite database
 frontend/src/

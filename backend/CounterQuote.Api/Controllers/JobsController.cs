@@ -32,7 +32,7 @@ public class JobsController(AppDbContext db) : ControllerBase
     [HttpPost]
     public async Task<ActionResult<Job>> Create(Job job)
     {
-        if (await Refusal(job) is ActionResult refused)
+        if (await Invalid(job) is ActionResult refused)
             return refused;
         job.Id = 0;
         job.CreatedDate = DateTime.UtcNow;
@@ -49,7 +49,7 @@ public class JobsController(AppDbContext db) : ControllerBase
         Job? job = await FullJobs.SingleOrDefaultAsync(j => j.Id == id);
         if (job is null)
             return NotFound();
-        if (await Refusal(changes) is ActionResult refused)
+        if (await Invalid(changes) is ActionResult refused)
             return refused;
 
         changes.Id = id;
@@ -90,16 +90,16 @@ public class JobsController(AppDbContext db) : ControllerBase
         return File(QuotePdf.Create(job), "application/pdf", $"quote-{job.Id}.pdf");
     }
 
-    private async Task<ActionResult?> Refusal(Job job)
+    private async Task<ActionResult?> Invalid(Job job)
     {
         if (await MissingPrices(job) is string problem)
-            return Refuse("counters", problem);
+            return BadRequestFor("counters", problem);
         if (job.QuoteDrawingSvg is string svg && !QuotePdf.IsSafeDrawing(svg))
-            return Refuse("quoteDrawingSvg", "The plan drawing must be a plain SVG, with no links, scripts, images or styles.");
+            return BadRequestFor("quoteDrawingSvg", "The plan drawing must be a plain SVG, with no links, scripts, images or styles.");
         return null;
     }
 
-    private BadRequestObjectResult Refuse(string field, string problem)
+    private BadRequestObjectResult BadRequestFor(string field, string problem)
     {
         ModelState.AddModelError(field, problem);
         return BadRequest(new ValidationProblemDetails(ModelState));

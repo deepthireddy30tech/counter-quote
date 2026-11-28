@@ -167,6 +167,10 @@ public class JobsControllerTests : IDisposable
     }
 
     [Fact]
+    public void A_drawing_whose_text_mentions_href_is_still_safe() =>
+        Assert.True(CounterQuote.Api.Pdf.QuotePdf.IsSafeDrawing("""<svg><text>Edge: Shrefton bevel</text></svg>"""));
+
+    [Fact]
     public async Task A_job_saved_without_a_price_has_no_pdf()
     {
         Job job = KitchenL();
@@ -186,6 +190,7 @@ public class JobsControllerTests : IDisposable
     [InlineData("""<svg><rect fill="url(http://example.com/a)"/></svg>""")]
     [InlineData("""<svg><style>@import url(x)</style></svg>""")]
     [InlineData("""<html><svg/></html>""")]
+    [InlineData("""<svg><a xlink:href="javascript:x"><text>x</text></a></svg>""")]
     public async Task A_drawing_that_could_reach_outside_itself_is_refused(string svg)
     {
         Job job = KitchenL();
