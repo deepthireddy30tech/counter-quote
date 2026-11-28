@@ -288,14 +288,12 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
         </section>
 
         <section className="card">
-          <div className="plan-title">
-            <h2>Plan · {name}</h2>
-            <button type="button" className="link" onClick={() => orientPlan((c) => { c.rotation = (c.rotation + 90) % 360; })}>Rotate ↻</button>
-            <button type="button" className="link" aria-pressed={counter.mirrored} onClick={() => orientPlan((c) => { c.mirrored = !c.mirrored; })}>Mirror ⇆</button>
-          </div>
+          <h2>Plan · {name}</h2>
           <PlanView counter={counter} unit={unit} edgeName={edgeName}
             onToggleEdge={(leg, side) => editLeg(leg, (x) => { x[`${side}Covered`] = !x[`${side}Covered`]; })}
-            onToggleCorner={(leg, key) => editLeg(leg, (x) => { x[key] = !x[key]; })} />
+            onToggleCorner={(leg, key) => editLeg(leg, (x) => { x[key] = !x[key]; })}
+            onRotate={() => orientPlan((c) => { c.rotation = (c.rotation + 90) % 360; })}
+            onMirror={() => orientPlan((c) => { c.mirrored = !c.mirrored; })} />
           <h3>Checks</h3>
           {errors.length + warnings.length === 0 && <p className="saved">Shape looks good.</p>}
           {errors.length > 0 && <ul className="errors">{errors.map((m) => <li key={m}>{m}</li>)}</ul>}
