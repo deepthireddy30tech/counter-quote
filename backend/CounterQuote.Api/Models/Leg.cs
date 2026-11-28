@@ -28,5 +28,6 @@ public class Leg
     public bool EndFrontRadius { get; set; }
     public bool EndBackRadius { get; set; }
 
+    [MaxLength(10, ErrorMessage = "A leg can have at most 10 cutouts.")]
     public List<Cutout> Cutouts { get; set; } = [];
 }

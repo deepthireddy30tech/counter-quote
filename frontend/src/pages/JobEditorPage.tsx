@@ -4,7 +4,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { type Counter, createJob, getJob, getPriceList, type Job, type Leg, type PriceList, updateJob } from '../api';
 import { useLeaveWarning } from '../hooks/useLeaveWarning';
 import {
-  type Layout, LAYOUTS, layoutOf, newCounter, quoteValidDays, ROOMS, sampleJob, toQuoteJob, toQuotePrices, withLayout, withLegAdded, withRoom,
+  type Layout, LAYOUTS, layoutOf, LIMITS, newCounter, quoteValidDays, ROOMS, sampleJob, toQuoteJob, toQuotePrices, withLayout, withLegAdded, withRoom,
   withSavedQuote,
 } from '../lib/jobEditor';
 import { formatMeasurement, parseMeasurement, type Unit } from '../lib/measure';
@@ -136,10 +136,12 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
         {names.map((n, i) => (
           <button key={i} type="button" role="tab" aria-selected={i === tab} className={i === tab ? 'tab active' : 'tab'} onClick={() => setTab(i)}>{n}</button>
         ))}
-        <button type="button" className="link" onClick={() => {
-          change((d) => { d.counters.push(newCounter('Kitchen', firstMaterial, firstEdge)); });
-          setTab(job.counters.length);
-        }}>+ Add counter</button>
+        {job.counters.length < LIMITS.counters ? (
+          <button type="button" className="link" onClick={() => {
+            change((d) => { d.counters.push(newCounter('Kitchen', firstMaterial, firstEdge)); });
+            setTab(job.counters.length);
+          }}>+ Add counter</button>
+        ) : <span className="muted">{LIMITS.counters} counters is the most a job can have.</span>}
       </div>
 
       <div className="editor">
@@ -205,7 +207,9 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
             </fieldset>
           ))}
           <p className="muted">Type 10′ 6″, 126, 23 1/2 or 3.2 m.</p>
-          <button type="button" className="link" onClick={() => editCounter(withLegAdded)}>+ Add leg</button>
+          {counter.legs.length < LIMITS.legs
+            ? <button type="button" className="link" onClick={() => editCounter(withLegAdded)}>+ Add leg</button>
+            : <p className="muted">{LIMITS.legs} legs is the most a counter can have.</p>}
 
           <h3>Cutouts</h3>
           {cutouts.length === 0 && <p className="muted">No sink or cooktop on this counter.</p>}
@@ -225,7 +229,9 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
                       const [moved] = k.legs[c.leg].cutouts.splice(c.i, 1);
                       k.legs[Number(e.target.value)].cutouts.push(moved);
                     })}>
-                      {counter.legs.map((_, i) => <option key={i} value={i}>Leg {i + 1}</option>)}
+                      {counter.legs.map((l, i) => (
+                        <option key={i} value={i} disabled={i !== c.leg && l.cutouts.length >= LIMITS.cutoutsPerLeg}>Leg {i + 1}</option>
+                      ))}
                     </select>
                   </label>
                 )}
@@ -240,9 +246,11 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
               </fieldset>
             );
           })}
-          <button type="button" className="link" onClick={() => editLeg(0, (l) => {
-            l.cutouts.push({ kind: 'undermount', centerline: Math.round(l.length / 2) || 30, faucetHoles: 1 });
-          })}>+ Add cutout</button>
+          {counter.legs[0].cutouts.length < LIMITS.cutoutsPerLeg ? (
+            <button type="button" className="link" onClick={() => editLeg(0, (l) => {
+              l.cutouts.push({ kind: 'undermount', centerline: Math.round(l.length / 2) || 30, faucetHoles: 1 });
+            })}>+ Add cutout</button>
+          ) : <p className="muted">Leg 1 has {LIMITS.cutoutsPerLeg} cutouts, the most a leg can have. Move one to another leg to add more.</p>}
 
           {/* the plan toggles edges and corners with a click; these boxes are the keyboard way, folded away */}
           <details>
@@ -330,9 +338,11 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
                 <button type="button" className="link" onClick={() => change((d) => { d.additionalRequirements.splice(i, 1); })}>Remove</button>
               </div>
             ))}
-            <button type="button" className="link" onClick={() => change((d) => { d.additionalRequirements.push({ description: '', price: NaN }); })}>
-              + Add requirement
-            </button>
+            {job.additionalRequirements.length < LIMITS.requirements ? (
+              <button type="button" className="link" onClick={() => change((d) => { d.additionalRequirements.push({ description: '', price: NaN }); })}>
+                + Add requirement
+              </button>
+            ) : <p className="muted">{LIMITS.requirements} requirements is the most a job can have.</p>}
           </fieldset>
           <p className="total">Total <strong>{shown.total == null ? '—' : `$${shown.total.toFixed(2)}`}</strong></p>
         </aside>

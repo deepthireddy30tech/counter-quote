@@ -264,6 +264,40 @@ describe('editing a counter', () => {
   });
 });
 
+describe('the limits the API accepts', () => {
+  it('stops offering + Add once a job, counter or leg is full', async () => {
+    const job = savedJob();
+    const [counter] = job.counters;
+    const sink = { kind: 'undermount' as const, centerline: 30, faucetHoles: 1 };
+    counter.legs[0].cutouts = Array.from({ length: 10 }, (_, i) => ({ ...sink, centerline: 20 + i * 6 }));
+    counter.legs[1].cutouts = [];
+    counter.legs.push(...Array.from({ length: 10 }, () => structuredClone(counter.legs[1])));
+    job.counters = Array.from({ length: 20 }, () => structuredClone(counter));
+    job.additionalRequirements = Array.from({ length: 50 }, (_, i) => ({ description: `Extra ${i + 1}`, price: 1 }));
+    vi.mocked(getJob).mockResolvedValue(job);
+    renderAt('/jobs/9');
+    expect(await screen.findByText('20 counters is the most a job can have.')).toBeTruthy();
+    expect(screen.getByText('12 legs is the most a counter can have.')).toBeTruthy();
+    expect(screen.getByText(/Leg 1 has 10 cutouts, the most a leg can have/)).toBeTruthy();
+    expect(screen.getByText('50 requirements is the most a job can have.')).toBeTruthy();
+    for (const name of ['+ Add counter', '+ Add leg', '+ Add cutout', '+ Add requirement']) {
+      expect(screen.queryByRole('button', { name })).toBeNull();
+    }
+  });
+
+  it('won’t move a cutout onto a full leg', async () => {
+    const job = savedJob();
+    const [counter] = job.counters;
+    const sink = { kind: 'undermount' as const, centerline: 30, faucetHoles: 1 };
+    counter.legs[0].cutouts = Array.from({ length: 10 }, (_, i) => ({ ...sink, centerline: 20 + i * 6 }));
+    counter.legs[1].cutouts = [{ ...sink, centerline: 30 }];
+    vi.mocked(getJob).mockResolvedValue(job);
+    renderAt('/jobs/9');
+    const last = (await screen.findAllByLabelText('On leg')).at(-1)! as HTMLSelectElement;
+    expect([...last.options].map((o) => o.disabled)).toEqual([true, false]);
+  });
+});
+
 describe('leaving with unsaved changes', () => {
   it('asks first, and stays if the salesperson cancels', async () => {
     const router = renderAt('/jobs/new');

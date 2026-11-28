@@ -24,9 +24,13 @@ public class Job
 
     public DateTime CreatedDate { get; set; }
 
+    // a cap on each list keeps one request from costing the server much (each counter is checked against the price list)
+    [MaxLength(20, ErrorMessage = "A job can have at most 20 counters.")]
     public List<Counter> Counters { get; set; } = [];
 
+    [MaxLength(50, ErrorMessage = "A job can have at most 50 additional requirements.")]
     public List<AdditionalRequirement> AdditionalRequirements { get; set; } = [];
 
+    [MaxLength(500, ErrorMessage = "A quote can have at most 500 line items.")]
     public List<QuoteLineItem> LineItems { get; set; } = [];
 }

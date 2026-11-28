@@ -2,7 +2,7 @@ services:
   api:
     build: ./backend
     ports:
-      - "5080:5080"
+      - "127.0.0.1:5080:5080" # this machine only: the API has no login
     volumes:
       - ./backend:/src
       - ./data:/data
@@ -10,7 +10,7 @@ services:
   web:
     build: ./frontend
     ports:
-      - "5173:5173"
+      - "127.0.0.1:5173:5173"
     environment:
       API_PROXY_TARGET: http://api:5080
     volumes:

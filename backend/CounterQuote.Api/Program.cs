@@ -2,6 +2,8 @@ using CounterQuote.Api.Data;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+// A job is a few KB (its plan drawing up to 500,000 characters); refuse anything far bigger before reading it.
+builder.WebHost.ConfigureKestrel(kestrel => kestrel.Limits.MaxRequestBodySize = 2_000_000);
 
 string dataFolder = Path.GetFullPath(builder.Configuration["DataFolder"] ?? "data", builder.Environment.ContentRootPath);
 Directory.CreateDirectory(dataFolder);
@@ -22,7 +24,10 @@ using (var scope = app.Services.CreateScope())
     Seed.Run(db);
 }
 
-app.UseSwagger();
-app.UseSwaggerUI();
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 app.MapControllers();
 app.Run();
