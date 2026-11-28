@@ -55,12 +55,14 @@ fieldset.leg label { display: flex; justify-content: space-between; align-items:
 label.check { display: flex; gap: 6px; align-items: center; margin: 4px 0; }
 .danger { color: #a61b1b; }
 .plan { width: 100%; height: auto; }
-.plan-title { display: flex; gap: 12px; align-items: baseline; }
-.plan-title h2 { margin-right: auto; }
+.plan-tools { display: flex; justify-content: flex-end; gap: 6px; }
+.plan-tools button { width: 44px; height: 44px; border: 1px solid #c8d0d8; border-radius: 6px; background: #fff; color: #1f2933; font-size: 18px; cursor: pointer; }
+.plan-tools button:hover { background: #eef2f6; }
+.plan-tools button:focus-visible { outline: 2px solid #1d5fa8; outline-offset: 1px; }
+.plan-tools button[aria-pressed='true'] { background: #1d5fa8; border-color: #1d5fa8; color: #fff; }
 .plan .hit { cursor: pointer; }
 .plan-empty { padding: 80px 0; text-align: center; }
-.legend { display: flex; flex-wrap: wrap; gap: 12px; list-style: none; padding: 0; font-size: 12px; }
-.legend span { display: inline-block; width: 14px; height: 4px; margin-right: 4px; vertical-align: middle; }
+.hint { font-size: 12px; margin: 4px 0 0; }
 .warnings { color: #8a5a00; background: #fff4cc; border: 1px solid #ecd27a; border-radius: 4px; padding: 8px; }
 ul.warnings { margin: 8px 0; padding-left: 28px; }
 .quote td { vertical-align: top; }

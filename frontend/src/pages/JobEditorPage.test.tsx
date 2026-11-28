@@ -91,9 +91,11 @@ describe('a reopened job', () => {
   it('turns and mirrors the plan without touching the saved quote, and the PDF drawing follows', async () => {
     vi.mocked(getJob).mockResolvedValue(savedJob());
     renderAt('/jobs/9');
-    await userEvent.click(await screen.findByRole('button', { name: 'Rotate ↻' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Mirror ⇆' }));
-    expect(screen.getByRole('button', { name: 'Mirror ⇆' }).getAttribute('aria-pressed')).toBe('true');
+    const mirror = await screen.findByRole('button', { name: 'Mirror plan' });
+    expect(mirror.getAttribute('aria-pressed')).toBe('false');
+    await userEvent.click(screen.getByRole('button', { name: 'Rotate plan' }));
+    await userEvent.click(mirror);
+    expect(mirror.getAttribute('aria-pressed')).toBe('true');
     expect(total()).toBe('$1234.50'); // still the saved quote
     await userEvent.click(screen.getByRole('button', { name: 'Save job' }));
     const sent = vi.mocked(updateJob).mock.calls[0][0];
