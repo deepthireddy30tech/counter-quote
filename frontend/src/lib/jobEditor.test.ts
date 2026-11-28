@@ -74,8 +74,10 @@ describe('withSavedQuote', () => {
 
   it('keeps the saved quote and its valid-until date when not re-priced', () => {
     const job = { ...sampleJob(3, 5), customerName: 'Ana ', total: 999, savedAt: '2026-11-01T00:00:00.000Z', validUntil: '2026-12-01T00:00:00.000Z', quoteDrawingSvg: '<svg>old</svg>' };
-    expect(withSavedQuote(job, null, 30, new Date('2026-11-27T15:00:00Z'), '<svg/>'))
+    expect(withSavedQuote(job, null, 30, new Date('2026-11-27T15:00:00Z'), null))
       .toMatchObject({ customerName: 'Ana', total: 999, quoteDrawingSvg: '<svg>old</svg>', savedAt: '2026-11-01T00:00:00.000Z', validUntil: '2026-12-01T00:00:00.000Z' });
+    // a plan turned without re-pricing gets a fresh drawing
+    expect(withSavedQuote(job, null, 30, new Date(), '<svg>new</svg>').quoteDrawingSvg).toBe('<svg>new</svg>');
   });
 
   it('keeps no quote for a job that can’t be priced', () => {

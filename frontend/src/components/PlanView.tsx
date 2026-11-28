@@ -1,10 +1,11 @@
-import type { Leg } from '../api';
+import type { Counter } from '../api';
 import { formatMeasurement, type Unit } from '../lib/measure';
 import { type CornerKey, planDrawing, profilePath, SIDE_NAMES } from '../lib/plan';
 import type { SideName } from '../lib/outline';
 
 const W = 640;
 const H = 400; // the plan; the edge-profile inset sits below it
+const PLAN_MARGIN = 76; // px, room for a size label beside an upright end
 const EXPOSED = '#0F5E5A';
 const COVERED = '#9AA5B1';
 const DIMENSION = '#2F6690';
@@ -18,17 +19,17 @@ const DEFS = (
 );
 
 /** The counter seen from above. Clicking an edge switches it exposed/covered; clicking a corner dot rounds it. */
-export function PlanView({ legs, unit, edgeName, onToggleEdge, onToggleCorner }: {
-  legs: Leg[]; unit: Unit; edgeName: string;
+export function PlanView({ counter, unit, edgeName, onToggleEdge, onToggleCorner }: {
+  counter: Counter; unit: Unit; edgeName: string;
   onToggleEdge: (leg: number, side: SideName) => void;
   onToggleCorner: (leg: number, key: CornerKey) => void;
 }) {
-  if (!planDrawing(legs, W, H, 48).outline.length) return <p className="plan-empty muted">Fix the sizes marked in Checks to see the plan.</p>;
+  if (!planDrawing(counter.legs, counter, W, H, PLAN_MARGIN).outline.length) return <p className="plan-empty muted">Fix the sizes marked in Checks to see the plan.</p>;
   return (
     <>
       <svg viewBox={`0 0 ${W} ${H + 80}`} className="plan" role="img" aria-label="Counter plan">
         {DEFS}
-        <PlanShapes legs={legs} unit={unit} edgeName={edgeName} onToggleEdge={onToggleEdge} onToggleCorner={onToggleCorner} />
+        <PlanShapes counter={counter} unit={unit} edgeName={edgeName} onToggleEdge={onToggleEdge} onToggleCorner={onToggleCorner} />
       </svg>
       <ul className="legend muted">
         <li><span style={{ background: EXPOSED }} />Exposed edge</li>
@@ -42,31 +43,54 @@ export function PlanView({ legs, unit, edgeName, onToggleEdge, onToggleCorner }:
 
 const TITLE = 28; // room for a counter's name above its plan in the quote drawing
 const CELL_H = TITLE + H + 80;
+const LEGEND_H = 56;
 
 /** Every counter's plan in one SVG, two to a row, for the saved quote's PDF. Nothing in it is clickable. */
-export function QuoteDrawing({ counters, unit }: { counters: { name: string; legs: Leg[]; edgeName: string }[]; unit: Unit }) {
+export function QuoteDrawing({ counters, unit }: { counters: { name: string; counter: Counter; edgeName: string }[]; unit: Unit }) {
   const columns = Math.min(2, counters.length);
   const rows = Math.ceil(counters.length / 2);
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 ${W * columns} ${CELL_H * rows}`}>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 ${W * columns} ${CELL_H * rows + LEGEND_H}`}>
       {DEFS}
       {counters.map((c, i) => (
         <g key={i} transform={`translate(${(i % 2) * W} ${Math.floor(i / 2) * CELL_H})`}>
           <text x="12" y="20" fontSize="16" fontWeight="bold" fill="#1f2933">{c.name}</text>
-          <g transform={`translate(0 ${TITLE})`}><PlanShapes legs={c.legs} unit={unit} edgeName={c.edgeName} /></g>
+          <g transform={`translate(0 ${TITLE})`}><PlanShapes counter={c.counter} unit={unit} edgeName={c.edgeName} /></g>
         </g>
       ))}
+      <g transform={`translate(12 ${CELL_H * rows + 8})`}><Legend /></g>
     </svg>
   );
 }
 
+/** What the PDF drawing's marks mean, in two rows so it fits one plan's width. */
+function Legend() {
+  return (
+    <g fontSize="12" fill="#1f2933">
+      <line x1="0" y1="10" x2="28" y2="10" stroke={EXPOSED} strokeWidth="4" />
+      <text x="36" y="14">Exposed edge (polished)</text>
+      <line x1="190" y1="10" x2="218" y2="10" stroke="url(#wall)" strokeWidth="10" />
+      <line x1="190" y1="10" x2="218" y2="10" stroke={COVERED} strokeWidth="2" />
+      <text x="226" y="14">Covered edge (wall)</text>
+      <circle cx="380" cy="10" r="6" fill={EXPOSED} />
+      <text x="394" y="14">Radius corner</text>
+      <rect x="0" y="28" width="28" height="16" rx="5" fill="#fff" stroke="#66727f" />
+      <text x="36" y="40">Sink</text>
+      <rect x="90" y="28" width="28" height="16" rx="2" fill="#fff" stroke="#66727f" strokeDasharray="4 3" />
+      <text x="126" y="40">Cooktop</text>
+      <text x="190" y="40" fill={DIMENSION}>8′ 0″</text>
+      <text x="226" y="40">Size (a length runs along the wall edge)</text>
+    </g>
+  );
+}
+
 /** The plan's shapes. Without the click handlers it's for print: no hit areas, and only rounded corners get a dot. */
-function PlanShapes({ legs, unit, edgeName, onToggleEdge, onToggleCorner }: {
-  legs: Leg[]; unit: Unit; edgeName: string;
+function PlanShapes({ counter, unit, edgeName, onToggleEdge, onToggleCorner }: {
+  counter: Counter; unit: Unit; edgeName: string;
   onToggleEdge?: (leg: number, side: SideName) => void;
   onToggleCorner?: (leg: number, key: CornerKey) => void;
 }) {
-  const plan = planDrawing(legs, W, H, 48);
+  const plan = planDrawing(counter.legs, counter, W, H, PLAN_MARGIN);
   return (
     <>
       <polygon points={plan.outline.map((p) => `${p.x},${p.y}`).join(' ')} fill="#E9E4DA" />

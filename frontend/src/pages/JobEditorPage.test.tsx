@@ -88,6 +88,20 @@ describe('a reopened job', () => {
     expect(await screen.findByText(/Saved\. The quote is kept at the prices of .*, valid until/)).toBeTruthy();
   });
 
+  it('turns and mirrors the plan without touching the saved quote, and the PDF drawing follows', async () => {
+    vi.mocked(getJob).mockResolvedValue(savedJob());
+    renderAt('/jobs/9');
+    await userEvent.click(await screen.findByRole('button', { name: 'Rotate ↻' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Mirror ⇆' }));
+    expect(screen.getByRole('button', { name: 'Mirror ⇆' }).getAttribute('aria-pressed')).toBe('true');
+    expect(total()).toBe('$1234.50'); // still the saved quote
+    await userEvent.click(screen.getByRole('button', { name: 'Save job' }));
+    const sent = vi.mocked(updateJob).mock.calls[0][0];
+    expect(sent.counters[0]).toMatchObject({ rotation: 90, mirrored: true });
+    expect(sent).toMatchObject({ total: 1234.5 });
+    expect(sent.quoteDrawingSvg).toContain('>Radius corner</text>');
+  });
+
   it('saves a re-priced quote with a new valid-until date', async () => {
     vi.mocked(getJob).mockResolvedValue(savedJob());
     renderAt('/jobs/9');

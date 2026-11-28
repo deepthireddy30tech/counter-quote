@@ -22,6 +22,9 @@ export interface Counter {
   thickness: Thickness;
   edgeProfileId: number;
   backsplash: boolean;
+  /** How the plan is drawn, clockwise in 90° steps (0, 90, 180, 270) and maybe mirrored. Never priced. */
+  rotation: number;
+  mirrored: boolean;
   legs: Leg[];
 }
 

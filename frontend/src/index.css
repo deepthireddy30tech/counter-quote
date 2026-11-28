@@ -55,6 +55,8 @@ fieldset.leg label { display: flex; justify-content: space-between; align-items:
 label.check { display: flex; gap: 6px; align-items: center; margin: 4px 0; }
 .danger { color: #a61b1b; }
 .plan { width: 100%; height: auto; }
+.plan-title { display: flex; gap: 12px; align-items: baseline; }
+.plan-title h2 { margin-right: auto; }
 .plan .hit { cursor: pointer; }
 .plan-empty { padding: 80px 0; text-align: center; }
 .legend { display: flex; flex-wrap: wrap; gap: 12px; list-style: none; padding: 0; font-size: 12px; }

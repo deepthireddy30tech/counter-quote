@@ -37,7 +37,7 @@ public class JobsControllerTests : IDisposable
         [
             new()
             {
-                Room = "Kitchen", MaterialId = _steelGrey, Thickness = 3, EdgeProfileId = _ogee, Backsplash = true,
+                Room = "Kitchen", MaterialId = _steelGrey, Thickness = 3, EdgeProfileId = _ogee, Backsplash = true, Rotation = 90, Mirrored = true,
                 Legs =
                 [
                     new() { Length = 120, Depth = 25.5, BackCovered = true, Cutouts = [new() { Kind = "undermount", Centerline = 60, FaucetHoles = 3 }] },
@@ -76,6 +76,7 @@ public class JobsControllerTests : IDisposable
         Assert.True(job.TearOut);
         Assert.Equal(["Kitchen", "Island"], job.Counters.Select(c => c.Room));
         Counter kitchen = job.Counters[0];
+        Assert.Equal((90, true), (kitchen.Rotation, kitchen.Mirrored));
         Assert.Equal([120.0, 96.0], kitchen.Legs.Select(l => l.Length));
         Assert.True(kitchen.Legs[1].EndFrontRadius);
         Cutout sink = Assert.Single(kitchen.Legs[0].Cutouts);
