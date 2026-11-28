@@ -76,14 +76,14 @@ describe('a reopened job', () => {
     expect(total()).toBe('$2205.00');
   });
 
-  it('saves without re-pricing by keeping the saved quote and its valid-until date', async () => {
-    vi.mocked(getJob).mockResolvedValue(savedJob());
+  it('saves without re-pricing by keeping the saved quote, its valid-until date and its drawing', async () => {
+    vi.mocked(getJob).mockResolvedValue(savedJob({ quoteDrawingSvg: '<svg>old</svg>' }));
     const confirm = vi.spyOn(window, 'confirm');
     renderAt('/jobs/9');
     await userEvent.click(await screen.findByRole('button', { name: 'Save job' }));
     expect(confirm).not.toHaveBeenCalled();
     const sent = vi.mocked(updateJob).mock.calls[0][0];
-    expect(sent).toMatchObject({ total: 1234.5, validUntil: '2099-12-01T15:00:00.000Z' });
+    expect(sent).toMatchObject({ total: 1234.5, validUntil: '2099-12-01T15:00:00.000Z', quoteDrawingSvg: '<svg>old</svg>' });
     expect(sent.lineItems.map((l) => l.description)).toEqual(['Old saved line']);
     expect(await screen.findByText(/Saved\. The quote is kept at the prices of .*, valid until/)).toBeTruthy();
   });

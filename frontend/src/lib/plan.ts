@@ -20,15 +20,15 @@ const HALF_LABEL = 28; // px, about half of a 13px "2′ 1 1/2″"
 /** How the salesperson turned the plan: clockwise in 90° steps, mirrored first. */
 export type Orientation = { rotation: number; mirrored: boolean };
 
-/** The counter drawn to fit a width × height box in px, keeping its proportions (y runs toward the room before it's turned). */
+/** The counter drawn to fit a width × height box in px, keeping its proportions (y runs toward the room before it's oriented). */
 export function planDrawing(legs: SavedLeg[], orientation: Orientation, width: number, height: number, margin: number): Plan {
   const shape = counterOutline(legs.map((l) => ({ length: l.length, depth: l.depth, turn: l.turnAngle })));
   const empty = { outline: [], edges: [], corners: [], cutouts: [], dimensions: [], errors: shape.errors };
   if (!shape.back.length) return empty;
-  const turn = turned(orientation);
+  const orient = oriented(orientation);
   // a mirror image swaps which side of an edge is the room, so labels must go the other way
   const hand = orientation.mirrored ? -1 : 1;
-  const all = [...shape.back, ...shape.front].map(turn);
+  const all = [...shape.back, ...shape.front].map(orient);
   const minX = Math.min(...all.map((p) => p.x));
   const minY = Math.min(...all.map((p) => p.y));
   const spanX = Math.max(...all.map((p) => p.x)) - minX;
@@ -37,7 +37,7 @@ export function planDrawing(legs: SavedLeg[], orientation: Orientation, width: n
   const offX = (width - spanX * scale) / 2;
   const offY = (height - spanY * scale) / 2;
   const px = (inches: Point): Point => {
-    const p = turn(inches);
+    const p = orient(inches);
     return { x: offX + (p.x - minX) * scale, y: offY + (p.y - minY) * scale };
   };
   const back = shape.back.map(px);
@@ -102,7 +102,7 @@ export function canRadius(leg: SavedLeg, key: CornerKey): boolean {
   return !leg[`${end}Covered`] && !leg[`${side}Covered`];
 }
 
-function turned({ rotation, mirrored }: Orientation): (p: Point) => Point {
+function oriented({ rotation, mirrored }: Orientation): (p: Point) => Point {
   const r = (rotation * Math.PI) / 180;
   const [cos, sin] = [Math.round(Math.cos(r)), Math.round(Math.sin(r))]; // exact for 90° steps
   return (p) => {

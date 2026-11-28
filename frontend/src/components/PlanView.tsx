@@ -58,28 +58,28 @@ export function QuoteDrawing({ counters, unit }: { counters: { name: string; cou
           <g transform={`translate(0 ${TITLE})`}><PlanShapes counter={c.counter} unit={unit} edgeName={c.edgeName} /></g>
         </g>
       ))}
-      <g transform={`translate(12 ${CELL_H * rows + 8})`}><Legend /></g>
+      <g transform={`translate(12 ${CELL_H * rows + 8})`}><Legend unit={unit} /></g>
     </svg>
   );
 }
 
 /** What the PDF drawing's marks mean, in two rows so it fits one plan's width. */
-function Legend() {
+function Legend({ unit }: { unit: Unit }) {
   return (
     <g fontSize="12" fill="#1f2933">
       <line x1="0" y1="10" x2="28" y2="10" stroke={EXPOSED} strokeWidth="4" />
-      <text x="36" y="14">Exposed edge (polished)</text>
-      <line x1="190" y1="10" x2="218" y2="10" stroke="url(#wall)" strokeWidth="10" />
-      <line x1="190" y1="10" x2="218" y2="10" stroke={COVERED} strokeWidth="2" />
-      <text x="226" y="14">Covered edge (wall)</text>
-      <circle cx="380" cy="10" r="6" fill={EXPOSED} />
-      <text x="394" y="14">Radius corner</text>
+      <text x="36" y="14">Exposed edge (polished, charged)</text>
+      <line x1="240" y1="10" x2="268" y2="10" stroke="url(#wall)" strokeWidth="10" />
+      <line x1="240" y1="10" x2="268" y2="10" stroke={COVERED} strokeWidth="2" />
+      <text x="276" y="14">Covered edge</text>
+      <circle cx="400" cy="10" r="6" fill={EXPOSED} />
+      <text x="414" y="14">Radius corner</text>
       <rect x="0" y="28" width="28" height="16" rx="5" fill="#fff" stroke="#66727f" />
       <text x="36" y="40">Sink</text>
       <rect x="90" y="28" width="28" height="16" rx="2" fill="#fff" stroke="#66727f" strokeDasharray="4 3" />
       <text x="126" y="40">Cooktop</text>
-      <text x="190" y="40" fill={DIMENSION}>8′ 0″</text>
-      <text x="226" y="40">Size (a length runs along the wall edge)</text>
+      <text x="190" y="40" fill={DIMENSION}>{formatMeasurement(96, unit)}</text>
+      <text x="240" y="40">Length, along the back edge into the corner</text>
     </g>
   );
 }

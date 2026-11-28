@@ -85,8 +85,8 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
   const counter = job.counters[tab];
   const editCounter = (edit: (c: Counter) => Counter | void) =>
     change((d) => { d.counters[tab] = edit(d.counters[tab]) ?? d.counters[tab]; });
-  // turning the plan changes only the drawing, never the price, so it keeps a saved quote
-  const turnPlan = (edit: (c: Counter) => void) => change((d) => { edit(d.counters[tab]); }, false);
+  // orienting the plan changes only the drawing, never the price, so it keeps a saved quote
+  const orientPlan = (edit: (c: Counter) => void) => change((d) => { edit(d.counters[tab]); }, false);
   const editLeg = (i: number, edit: (l: Leg) => void) => editCounter((c) => { edit(c.legs[i]); });
 
   const names = quote.counters.map((c) => c.name);
@@ -111,8 +111,9 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
     if (expired && !window.confirm('This quote is past its valid-until date. Save it with its old prices anyway? Choose Cancel, then Re-price, for today\'s prices.')) return;
     const erasing = live && quote.total == null && stored.total != null;
     if (erasing && !window.confirm(`Today's price list can't price this job, so saving removes its saved quote of $${stored.total!.toFixed(2)}. Save anyway?`)) return;
-    // the PDF shows every counter's plan as it was priced, turned the way the salesperson left it
-    const drawing = (live ? quote.total : stored.total) != null
+    // the PDF shows every counter's plan as it was priced, oriented the way the salesperson left it
+    const reoriented = job.counters.some((c, i) => c.rotation !== stored.counters[i]?.rotation || c.mirrored !== stored.counters[i]?.mirrored);
+    const drawing = (live ? quote.total != null : reoriented && stored.total != null)
       ? renderToStaticMarkup(<QuoteDrawing unit={unit} counters={job.counters.map((c, i) => ({ name: names[i], counter: c, edgeName: edgeNameOf(c) }))} />)
       : null;
     save.mutate(withSavedQuote(job, live ? quote : null, quoteValidDays(prices), new Date(), drawing));
@@ -289,8 +290,8 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
         <section className="card">
           <div className="plan-title">
             <h2>Plan · {name}</h2>
-            <button type="button" className="link" onClick={() => turnPlan((c) => { c.rotation = (c.rotation + 90) % 360; })}>Rotate ↻</button>
-            <button type="button" className="link" aria-pressed={counter.mirrored} onClick={() => turnPlan((c) => { c.mirrored = !c.mirrored; })}>Mirror ⇆</button>
+            <button type="button" className="link" onClick={() => orientPlan((c) => { c.rotation = (c.rotation + 90) % 360; })}>Rotate ↻</button>
+            <button type="button" className="link" aria-pressed={counter.mirrored} onClick={() => orientPlan((c) => { c.mirrored = !c.mirrored; })}>Mirror ⇆</button>
           </div>
           <PlanView counter={counter} unit={unit} edgeName={edgeName}
             onToggleEdge={(leg, side) => editLeg(leg, (x) => { x[`${side}Covered`] = !x[`${side}Covered`]; })}

@@ -34,6 +34,10 @@ _Avoid_: Run length, width
 The angle inside the corner between a leg and the leg before it: 90° for a square corner, 135° where a corner cabinet sits at 45°.
 _Avoid_: Bend, rotation, heading, corner angle
 
+**Orientation**:
+How a counter's plan is drawn on screen and in the PDF: rotated clockwise in 90° steps, and maybe mirrored, to match the room. Drawing only; never priced.
+_Avoid_: Turn angle (that's between two legs), direction
+
 **Thickness**:
 How thick a counter's stone is: 2 cm or 3 cm. Chosen per counter; changes the price per square foot.
 _Avoid_: Slab thickness, gauge, depth (depth is front to back)
