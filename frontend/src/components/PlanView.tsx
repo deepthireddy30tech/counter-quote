@@ -5,6 +5,7 @@ import type { SideName } from '../lib/outline';
 
 const W = 640;
 const H = 400; // the plan; the edge-profile inset sits below it
+const DRAWN_H = H + 80; // the plan and its edge-profile inset
 const PLAN_MARGIN = 76; // px, room for a size label beside an upright end
 const EXPOSED = '#0F5E5A';
 const COVERED = '#9AA5B1';
@@ -29,26 +30,28 @@ export function PlanView({ counter, unit, edgeName, onToggleEdge, onToggleCorner
   if (!planDrawing(counter.legs, counter, W, H, PLAN_MARGIN).outline.length) return <p className="plan-empty muted">Fix the sizes marked in Checks to see the plan.</p>;
   return (
     <>
-      <div className="plan-box">
-        <svg viewBox={`0 0 ${W} ${H + 80 + LEGEND_H}`} className="plan" role="img" aria-label="Counter plan">
-          {DEFS}
-          <PlanShapes counter={counter} unit={unit} edgeName={edgeName} onToggleEdge={onToggleEdge} onToggleCorner={onToggleCorner} />
-          {/* the same legend the PDF prints, so the screen and the customer's copy read alike */}
-          <g transform={`translate(12 ${H + 80 + 8})`}><Legend unit={unit} /></g>
-        </svg>
-        <div className="plan-tools">
-          <button type="button" aria-label="Rotate plan" title="Rotate 90° clockwise" onClick={onRotate}>↻</button>
-          <button type="button" aria-label="Mirror plan" title="Mirror left to right" aria-pressed={counter.mirrored} onClick={onMirror}>⇆</button>
-        </div>
+      {/* above the drawing rather than over it, so they never hide a label when the card is narrow */}
+      <div className="plan-tools">
+        <button type="button" aria-label="Rotate plan" title="Rotate 90° clockwise" onClick={onRotate}>↻</button>
+        <button type="button" aria-label="Mirror plan" title="Mirror left to right" aria-pressed={counter.mirrored} onClick={onMirror}>⇆</button>
       </div>
+      <svg viewBox={`0 0 ${W} ${DRAWN_H + LEGEND_H}`} className="plan" role="img" aria-label={PLAN_LABEL}>
+        {DEFS}
+        <PlanShapes counter={counter} unit={unit} edgeName={edgeName} onToggleEdge={onToggleEdge} onToggleCorner={onToggleCorner} />
+        {/* the same legend the PDF prints, so the screen and the customer's copy read alike */}
+        <g transform={`translate(12 ${DRAWN_H + 8})`}><Legend unit={unit} /></g>
+      </svg>
       <p className="muted hint">Click an edge to switch it, or a corner dot to make it a radius corner.</p>
     </>
   );
 }
 
 const TITLE = 28; // room for a counter's name above its plan in the quote drawing
-const CELL_H = TITLE + H + 80;
+const CELL_H = TITLE + DRAWN_H;
 const LEGEND_H = 56;
+// role="img" hides the drawn legend from screen readers, so the label says what it says
+const PLAN_LABEL = 'Counter plan. Solid teal edges are exposed (polished, charged); hatched grey edges are covered; '
+  + 'a dot is a radius corner; a rounded box is a sink and a dashed box a cooktop; blue numbers are lengths along the back edge.';
 
 /** Every counter's plan in one SVG, two to a row, for the saved quote's PDF. Nothing in it is clickable. */
 export function QuoteDrawing({ counters, unit }: { counters: { name: string; counter: Counter; edgeName: string }[]; unit: Unit }) {
