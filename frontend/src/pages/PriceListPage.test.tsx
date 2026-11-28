@@ -43,27 +43,27 @@ describe('the price list page', () => {
     await userEvent.click(screen.getByRole('button', { name: '+ Add material' }));
     await userEvent.click(screen.getByRole('button', { name: '+ Add edge profile' }));
     await userEvent.click(screen.getByRole('button', { name: 'Save price list' }));
-    expect(screen.getAllByRole('listitem').length).toBeGreaterThan(0);
+    expect(screen.getByText('Every price group needs a name.')).toBeTruthy();
     expect(savePriceList).not.toHaveBeenCalled();
 
     await userEvent.type(screen.getAllByLabelText('Price group name')[1], 'Quartz 1');
     fireEvent.change(screen.getByLabelText('Quartz 1 2 cm price per sq ft (changed, new)'), { target: { value: '55' } });
     fireEvent.change(screen.getByLabelText('Quartz 1 3 cm price per sq ft (changed, new)'), { target: { value: '65' } });
-    await userEvent.type(screen.getAllByLabelText('Material name')[1], 'Calacatta');
+    await userEvent.type(screen.getAllByLabelText('Material name').at(-1)!, 'Calacatta');
     await userEvent.selectOptions(screen.getByLabelText('Calacatta price group'), 'Granite 2');
-    await userEvent.type(screen.getAllByLabelText('Edge profile name')[1], 'Ogee');
-    fireEvent.change(screen.getByLabelText('Ogee price per linear ft (changed, new)'), { target: { value: '25' } });
+    await userEvent.type(screen.getAllByLabelText('Edge profile name').at(-1)!, 'Bullnose');
+    fireEvent.change(screen.getByLabelText('Bullnose price per linear ft (changed, new)'), { target: { value: '25' } });
     await userEvent.click(screen.getByRole('button', { name: 'Save price list' }));
     const sent = vi.mocked(savePriceList).mock.calls[0][0];
     expect(sent.priceGroups.map((g) => g.name)).toEqual(['Granite 2', 'Quartz 1']);
-    expect(sent.materials.map((m) => [m.name, m.priceGroupId])).toEqual([['Steel Grey', 7], ['Calacatta', 7]]);
+    expect(sent.materials.map((m) => [m.name, m.priceGroupId])).toEqual([['Steel Grey', 7], ['Black Pearl', 7], ['Calacatta', 7]]);
   });
 
   it('drops a new row at once, and marks a saved one for removal with an Undo', async () => {
     renderAt('/price-list');
     await userEvent.click(await screen.findByRole('button', { name: '+ Add edge profile' }));
     await userEvent.click(screen.getByRole('button', { name: 'Remove new Edge profile' }));
-    expect(screen.getAllByLabelText('Edge profile name')).toHaveLength(1);
+    expect(screen.getAllByLabelText('Edge profile name')).toHaveLength(2);
 
     await userEvent.click(screen.getByRole('button', { name: 'Remove Steel Grey' }));
     expect(screen.getByText('Removed when you save')).toBeTruthy();
@@ -71,8 +71,7 @@ describe('the price list page', () => {
     expect(screen.queryByText('Removed when you save')).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Remove Steel Grey' }));
     await userEvent.click(screen.getByRole('button', { name: 'Save price list' }));
-    expect(screen.getByText(/needs at least one price group, one material and one edge profile/)).toBeTruthy();
-    expect(savePriceList).not.toHaveBeenCalled();
+    expect(vi.mocked(savePriceList).mock.calls[0][0].materials.map((m) => m.name)).toEqual(['Black Pearl']);
   });
 
   it('says why loading or saving failed', async () => {

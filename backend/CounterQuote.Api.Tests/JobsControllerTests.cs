@@ -112,7 +112,7 @@ public class JobsControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task The_job_list_is_newest_first_with_each_job_complete()
+    public async Task The_job_list_is_newest_first_with_each_jobs_counters_and_legs()
     {
         int older = await Create(KitchenL("Rivera"));
         int newer = await Create(KitchenL("Okafor"));

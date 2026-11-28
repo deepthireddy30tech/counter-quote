@@ -76,7 +76,9 @@ describe('a reopened job', () => {
     renderAt('/jobs/9');
     await userEvent.click(await screen.findByRole('button', { name: 'Save job' }));
     expect(confirm).not.toHaveBeenCalled();
-    expect(vi.mocked(updateJob).mock.calls[0][0]).toMatchObject({ total: 1234.5, validUntil: '2099-12-01T15:00:00.000Z' });
+    const sent = vi.mocked(updateJob).mock.calls[0][0];
+    expect(sent).toMatchObject({ total: 1234.5, validUntil: '2099-12-01T15:00:00.000Z' });
+    expect(sent.lineItems.map((l) => l.description)).toEqual(['Old saved line']);
     expect(await screen.findByText(/Saved\. The quote is kept at the prices of .*, valid until/)).toBeTruthy();
   });
 
@@ -87,7 +89,9 @@ describe('a reopened job', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save job' }));
     const sent = vi.mocked(updateJob).mock.calls[0][0];
     expect(sent.total).toBe(1805);
-    expect(sent.validUntil).not.toBe('2099-12-01T15:00:00.000Z');
+    const days = (Date.parse(sent.validUntil!) - Date.now()) / 86_400_000;
+    expect(days).toBeGreaterThan(29); // quoteValidDays is 30
+    expect(days).toBeLessThanOrEqual(30);
     await waitFor(() => expect(screen.queryByText('Unsaved changes')).toBeNull());
   });
 
@@ -117,6 +121,9 @@ describe('a reopened job', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save job' }));
     expect(confirm).toHaveBeenCalledWith(expect.stringMatching(/removes its saved quote of \$1234\.50/));
     expect(updateJob).not.toHaveBeenCalled();
+    confirm.mockReturnValue(true);
+    await userEvent.click(screen.getByRole('button', { name: 'Save job' }));
+    expect(vi.mocked(updateJob).mock.calls[0][0]).toMatchObject({ total: null, lineItems: [], savedAt: null, validUntil: null });
   });
 
   it('says when the job or the price list can’t be loaded', async () => {
@@ -192,8 +199,11 @@ describe('editing a counter', () => {
   it('changes the material, thickness, edge profile and backsplash', async () => {
     await userEvent.click(screen.getByRole('button', { name: '2 cm' }));
     expect(screen.getByText('Steel Grey, 2 cm')).toBeTruthy();
-    await userEvent.selectOptions(screen.getByLabelText('Material'), 'Steel Grey');
-    await userEvent.selectOptions(screen.getByLabelText('Edge profile'), 'Eased');
+    await userEvent.selectOptions(screen.getByLabelText('Material'), 'Black Pearl');
+    expect(screen.getByText('Black Pearl, 2 cm')).toBeTruthy();
+    expect(screen.queryByText(/Ogee/, { selector: '.quote td' })).toBeNull();
+    await userEvent.selectOptions(screen.getByLabelText('Edge profile'), 'Ogee');
+    expect(screen.getByText(/Ogee/, { selector: '.quote td' })).toBeTruthy();
     await userEvent.click(screen.getByLabelText(/backsplash on covered edges/));
     expect(screen.getByText(/backsplash/i, { selector: '.quote td' })).toBeTruthy();
   });
@@ -205,7 +215,9 @@ describe('editing a counter', () => {
     await userEvent.selectOptions(within(second).getByLabelText('Kind'), 'cooktop');
     const cooktop = screen.getByText('Cooktop 2').closest('fieldset')!;
     expect(within(cooktop).queryByLabelText('Faucet holes')).toBeNull();
-    await userEvent.selectOptions(within(cooktop).getByLabelText('On leg'), '1');
+    await userEvent.selectOptions(within(cooktop).getByLabelText('On leg'), 'Leg 2');
+    const moved = screen.getByText(/^Cooktop \d+$/).closest('fieldset')!; // re-rendered under its new leg
+    expect((within(moved).getByLabelText('On leg') as HTMLSelectElement).selectedOptions[0].textContent).toBe('Leg 2');
     fireEvent.change(within(screen.getByText('Undermount sink 1').closest('fieldset')!).getByLabelText('Faucet holes'), { target: { value: '3' } });
     expect(screen.getByText('Faucet hole', { selector: '.quote td *, .quote td' })).toBeTruthy();
     await userEvent.click(within(screen.getByText('Cooktop 2').closest('fieldset')!).getByRole('button', { name: 'Remove' }));
