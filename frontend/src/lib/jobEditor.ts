@@ -65,7 +65,7 @@ export function newLeg(room: Room, length: number, depth = ROOM_DEFAULTS[room].d
 }
 
 export function newCounter(room: Room, materialId: number, edgeProfileId: number): SavedCounter {
-  return { room, materialId, thickness: 3, edgeProfileId, backsplash: false, legs: [newLeg(room, NEW_LEG_LENGTH)] };
+  return { room, materialId, thickness: 3, edgeProfileId, backsplash: false, rotation: 0, mirrored: false, legs: [newLeg(room, NEW_LEG_LENGTH)] };
 }
 
 /** What a new job opens with: a Kitchen L against two walls, with an undermount sink. */
@@ -110,9 +110,10 @@ export function withRoom(counter: SavedCounter, room: Room): SavedCounter {
 
 /**
  * The job with today's quote attached, ready to save (ADR 0002). A job that can't be priced saves with no quote.
- * A null quote keeps the job's saved quote and its valid-until date, for a job saved without re-pricing.
+ * A null quote keeps the job's saved quote and valid-until date, for a job saved without re-pricing.
+ * drawing is the plan SVG for the PDF, kept only with a priced quote; null keeps the saved one.
  */
-export function withSavedQuote(job: SavedJob, quote: Quote | null, validDays: number, now: Date): SavedJob {
+export function withSavedQuote(job: SavedJob, quote: Quote | null, validDays: number, now: Date, drawing: string | null): SavedJob {
   const tidied = {
     ...job,
     customerName: job.customerName.trim(),
@@ -121,13 +122,14 @@ export function withSavedQuote(job: SavedJob, quote: Quote | null, validDays: nu
       .filter((r) => r.description.trim())
       .map((r) => ({ description: r.description.trim(), price: r.price || 0 })),
   };
-  if (!quote) return tidied;
+  if (!quote) return { ...tidied, quoteDrawingSvg: drawing ?? job.quoteDrawingSvg };
   const validUntil = new Date(now);
   validUntil.setDate(validUntil.getDate() + validDays);
   return {
     ...tidied,
     lineItems: quote.items,
     total: quote.total,
+    quoteDrawingSvg: quote.total == null ? null : drawing,
     savedAt: quote.total == null ? null : now.toISOString(),
     validUntil: quote.total == null ? null : validUntil.toISOString(),
   };

@@ -34,6 +34,12 @@ beforeEach(() => {
 });
 
 describe('a reopened job', () => {
+  it('links to the PDF of its saved quote', async () => {
+    vi.mocked(getJob).mockResolvedValue(savedJob());
+    renderAt('/jobs/9');
+    expect((await screen.findByRole('link', { name: 'PDF of saved quote' })).getAttribute('href')).toBe('/api/jobs/9/pdf');
+  });
+
   it('shows its saved quote and a notice that today’s prices differ', async () => {
     vi.mocked(getJob).mockResolvedValue(savedJob());
     renderAt('/jobs/9');
@@ -70,16 +76,30 @@ describe('a reopened job', () => {
     expect(total()).toBe('$2205.00');
   });
 
-  it('saves without re-pricing by keeping the saved quote and its valid-until date', async () => {
-    vi.mocked(getJob).mockResolvedValue(savedJob());
+  it('saves without re-pricing by keeping the saved quote, its valid-until date and its drawing', async () => {
+    vi.mocked(getJob).mockResolvedValue(savedJob({ quoteDrawingSvg: '<svg>old</svg>' }));
     const confirm = vi.spyOn(window, 'confirm');
     renderAt('/jobs/9');
     await userEvent.click(await screen.findByRole('button', { name: 'Save job' }));
     expect(confirm).not.toHaveBeenCalled();
     const sent = vi.mocked(updateJob).mock.calls[0][0];
-    expect(sent).toMatchObject({ total: 1234.5, validUntil: '2099-12-01T15:00:00.000Z' });
+    expect(sent).toMatchObject({ total: 1234.5, validUntil: '2099-12-01T15:00:00.000Z', quoteDrawingSvg: '<svg>old</svg>' });
     expect(sent.lineItems.map((l) => l.description)).toEqual(['Old saved line']);
     expect(await screen.findByText(/Saved\. The quote is kept at the prices of .*, valid until/)).toBeTruthy();
+  });
+
+  it('turns and mirrors the plan without touching the saved quote, and the PDF drawing follows', async () => {
+    vi.mocked(getJob).mockResolvedValue(savedJob());
+    renderAt('/jobs/9');
+    await userEvent.click(await screen.findByRole('button', { name: 'Rotate ↻' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Mirror ⇆' }));
+    expect(screen.getByRole('button', { name: 'Mirror ⇆' }).getAttribute('aria-pressed')).toBe('true');
+    expect(total()).toBe('$1234.50'); // still the saved quote
+    await userEvent.click(screen.getByRole('button', { name: 'Save job' }));
+    const sent = vi.mocked(updateJob).mock.calls[0][0];
+    expect(sent.counters[0]).toMatchObject({ rotation: 90, mirrored: true });
+    expect(sent).toMatchObject({ total: 1234.5 });
+    expect(sent.quoteDrawingSvg).toContain('>Radius corner</text>');
   });
 
   it('saves a re-priced quote with a new valid-until date', async () => {
@@ -89,6 +109,10 @@ describe('a reopened job', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save job' }));
     const sent = vi.mocked(updateJob).mock.calls[0][0];
     expect(sent.total).toBe(1805);
+    // the PDF's plan: every counter, by name, with no click targets
+    expect(sent.quoteDrawingSvg).toMatch(/^<svg xmlns="http:\/\/www.w3.org\/2000\/svg"/);
+    expect(sent.quoteDrawingSvg).toContain('>Kitchen L</text>');
+    expect(sent.quoteDrawingSvg).not.toContain('class="hit"');
     const days = (Date.parse(sent.validUntil!) - Date.now()) / 86_400_000;
     expect(days).toBeGreaterThan(29); // quoteValidDays is 30
     expect(days).toBeLessThanOrEqual(30);

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { type Counter, createJob, getJob, getPriceList, type Job, type Leg, type PriceList, updateJob } from '../api';
 import { useLeaveWarning } from '../hooks/useLeaveWarning';
@@ -10,7 +11,7 @@ import {
 import { formatMeasurement, parseMeasurement, type Unit } from '../lib/measure';
 import type { SideName } from '../lib/outline';
 import { CUTOUTS, type CutoutKind, priceJob, type Room } from '../lib/quote';
-import { PlanView } from '../components/PlanView';
+import { PlanView, QuoteDrawing } from '../components/PlanView';
 import { canRadius, SIDE_NAMES } from '../lib/plan';
 
 /** /jobs/new opens a sample Kitchen L; /jobs/:id opens the saved job. */
@@ -84,6 +85,8 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
   const counter = job.counters[tab];
   const editCounter = (edit: (c: Counter) => Counter | void) =>
     change((d) => { d.counters[tab] = edit(d.counters[tab]) ?? d.counters[tab]; });
+  // orienting the plan changes only the drawing, never the price, so it keeps a saved quote
+  const orientPlan = (edit: (c: Counter) => void) => change((d) => { edit(d.counters[tab]); }, false);
   const editLeg = (i: number, edit: (l: Leg) => void) => editCounter((c) => { edit(c.legs[i]); });
 
   const names = quote.counters.map((c) => c.name);
@@ -92,7 +95,8 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
   const errors = mine(quote.errors);
   const warnings = mine(quote.warnings);
   const summary = quote.counters[tab];
-  const edgeName = prices.edgeProfiles.find((e) => e.id === counter.edgeProfileId)?.name ?? 'Missing';
+  const edgeNameOf = (c: Counter) => prices.edgeProfiles.find((e) => e.id === c.edgeProfileId)?.name ?? 'Missing';
+  const edgeName = edgeNameOf(counter);
   const layout = layoutOf(counter);
   const firstMaterial = prices.materials[0]?.id ?? 0;
   const firstEdge = prices.edgeProfiles[0]?.id ?? 0;
@@ -107,7 +111,12 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
     if (expired && !window.confirm('This quote is past its valid-until date. Save it with its old prices anyway? Choose Cancel, then Re-price, for today\'s prices.')) return;
     const erasing = live && quote.total == null && stored.total != null;
     if (erasing && !window.confirm(`Today's price list can't price this job, so saving removes its saved quote of $${stored.total!.toFixed(2)}. Save anyway?`)) return;
-    save.mutate(withSavedQuote(job, live ? quote : null, quoteValidDays(prices), new Date()));
+    // the PDF shows every counter's plan as it was priced, oriented the way the salesperson left it
+    const reoriented = job.counters.some((c, i) => c.rotation !== stored.counters[i]?.rotation || c.mirrored !== stored.counters[i]?.mirrored);
+    const drawing = (live ? quote.total != null : reoriented && stored.total != null)
+      ? renderToStaticMarkup(<QuoteDrawing unit={unit} counters={job.counters.map((c, i) => ({ name: names[i], counter: c, edgeName: edgeNameOf(c) }))} />)
+      : null;
+    save.mutate(withSavedQuote(job, live ? quote : null, quoteValidDays(prices), new Date(), drawing));
   };
   const removeCounter = () => {
     if (!window.confirm(`Remove ${name}?`)) return;
@@ -125,6 +134,7 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
         </label>
         <div className="page-actions">
           {unsaved && <span className="unsaved">Unsaved changes</span>}
+          {stored.id > 0 && stored.total != null && <a className="link" href={`/api/jobs/${stored.id}/pdf`}>PDF of saved quote</a>}
           <button type="submit" className="button" disabled={save.isPending}>Save job</button>
         </div>
       </div>
@@ -278,8 +288,12 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
         </section>
 
         <section className="card">
-          <h2>Plan · {name}</h2>
-          <PlanView legs={counter.legs} unit={unit} edgeName={edgeName}
+          <div className="plan-title">
+            <h2>Plan · {name}</h2>
+            <button type="button" className="link" onClick={() => orientPlan((c) => { c.rotation = (c.rotation + 90) % 360; })}>Rotate ↻</button>
+            <button type="button" className="link" aria-pressed={counter.mirrored} onClick={() => orientPlan((c) => { c.mirrored = !c.mirrored; })}>Mirror ⇆</button>
+          </div>
+          <PlanView counter={counter} unit={unit} edgeName={edgeName}
             onToggleEdge={(leg, side) => editLeg(leg, (x) => { x[`${side}Covered`] = !x[`${side}Covered`]; })}
             onToggleCorner={(leg, key) => editLeg(leg, (x) => { x[key] = !x[key]; })} />
           <h3>Checks</h3>

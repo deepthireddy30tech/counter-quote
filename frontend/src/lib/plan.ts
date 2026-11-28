@@ -15,13 +15,20 @@ export type Plan = { outline: Point[]; edges: PlanEdge[]; corners: PlanCorner[];
 export const SIDE_NAMES: Record<SideName, string> = { back: 'back', front: 'front', start: 'start end', end: 'finish end' };
 
 const LABEL_GAP = 16; // px between an edge and its dimension label
+const HALF_LABEL = 28; // px, about half of a 13px "2′ 1 1/2″"
 
-/** The counter drawn to fit a width × height box in px, keeping its proportions (y runs toward the room). */
-export function planDrawing(legs: SavedLeg[], width: number, height: number, margin: number): Plan {
+/** How the salesperson turned the plan: clockwise in 90° steps, mirrored first. */
+export type Orientation = { rotation: number; mirrored: boolean };
+
+/** The counter drawn to fit a width × height box in px, keeping its proportions (y runs toward the room before it's oriented). */
+export function planDrawing(legs: SavedLeg[], orientation: Orientation, width: number, height: number, margin: number): Plan {
   const shape = counterOutline(legs.map((l) => ({ length: l.length, depth: l.depth, turn: l.turnAngle })));
   const empty = { outline: [], edges: [], corners: [], cutouts: [], dimensions: [], errors: shape.errors };
   if (!shape.back.length) return empty;
-  const all = [...shape.back, ...shape.front];
+  const orient = oriented(orientation);
+  // a mirror image swaps which side of an edge is the room, so labels must go the other way
+  const hand = orientation.mirrored ? -1 : 1;
+  const all = [...shape.back, ...shape.front].map(orient);
   const minX = Math.min(...all.map((p) => p.x));
   const minY = Math.min(...all.map((p) => p.y));
   const spanX = Math.max(...all.map((p) => p.x)) - minX;
@@ -29,7 +36,10 @@ export function planDrawing(legs: SavedLeg[], width: number, height: number, mar
   const scale = Math.min((width - 2 * margin) / spanX, (height - 2 * margin) / spanY);
   const offX = (width - spanX * scale) / 2;
   const offY = (height - spanY * scale) / 2;
-  const px = (p: Point): Point => ({ x: offX + (p.x - minX) * scale, y: offY + (p.y - minY) * scale });
+  const px = (inches: Point): Point => {
+    const p = orient(inches);
+    return { x: offX + (p.x - minX) * scale, y: offY + (p.y - minY) * scale };
+  };
   const back = shape.back.map(px);
   const front = shape.front.map(px);
   const n = legs.length;
@@ -64,17 +74,20 @@ export function planDrawing(legs: SavedLeg[], width: number, height: number, mar
         x: shape.back[i].x + dir.x * c.centerline + toRoom.x * inFrom,
         y: shape.back[i].y + dir.y * c.centerline + toRoom.y * inFrom,
       });
-      return { kind: c.kind, leg: i, center, width: spec.width * scale, depth: spec.depth * scale, angle: (Math.atan2(dir.y, dir.x) * 180) / Math.PI, faucetHoles: c.faucetHoles };
+      const along = unit(px(shape.back[i]), px(shape.back[i + 1]));
+      return { kind: c.kind, leg: i, center, width: spec.width * scale, depth: spec.depth * scale, angle: (Math.atan2(along.y, along.x) * 180) / Math.PI, faucetHoles: c.faucetHoles };
     });
   });
 
   const outside = (a: Point, b: Point, away: Point): Point => {
     const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-    return { x: mid.x + away.x * LABEL_GAP, y: mid.y + away.y * LABEL_GAP };
+    // centred text sticks out sideways by half its width, so a label beside an upright edge goes further out
+    const gap = LABEL_GAP + Math.abs(away.x) * HALF_LABEL;
+    return { x: mid.x + away.x * gap, y: mid.y + away.y * gap };
   };
   const dimensions = legs.map((l, i) => {
     const d = unit(back[i], back[i + 1]);
-    return { at: outside(back[i], back[i + 1], { x: d.y, y: -d.x }), inches: l.length };
+    return { at: outside(back[i], back[i + 1], { x: hand * d.y, y: -hand * d.x }), inches: l.length };
   });
   const d0 = unit(back[0], back[1]);
   dimensions.push({ at: outside(back[0], front[0], { x: -d0.x, y: -d0.y }), inches: legs[0].depth });
@@ -87,6 +100,15 @@ export function canRadius(leg: SavedLeg, key: CornerKey): boolean {
   const end = key.startsWith('start') ? 'start' : 'end';
   const side = key.includes('Front') ? 'front' : 'back';
   return !leg[`${end}Covered`] && !leg[`${side}Covered`];
+}
+
+function oriented({ rotation, mirrored }: Orientation): (p: Point) => Point {
+  const r = (rotation * Math.PI) / 180;
+  const [cos, sin] = [Math.round(Math.cos(r)), Math.round(Math.sin(r))]; // exact for 90° steps
+  return (p) => {
+    const x = mirrored ? -p.x : p.x;
+    return { x: x * cos - p.y * sin, y: x * sin + p.y * cos };
+  };
 }
 
 function unit(a: Point, b: Point): Point {

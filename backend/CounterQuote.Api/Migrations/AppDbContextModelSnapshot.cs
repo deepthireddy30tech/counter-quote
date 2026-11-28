@@ -62,12 +62,18 @@ namespace CounterQuote.Api.Migrations
                     b.Property<int>("MaterialId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("Mirrored")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("Position")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Room")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("Rotation")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Thickness")
                         .HasColumnType("INTEGER");

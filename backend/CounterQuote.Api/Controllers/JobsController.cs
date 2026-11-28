@@ -1,5 +1,6 @@
 using CounterQuote.Api.Data;
 using CounterQuote.Api.Models;
+using CounterQuote.Api.Pdf;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -31,8 +32,8 @@ public class JobsController(AppDbContext db) : ControllerBase
     [HttpPost]
     public async Task<ActionResult<Job>> Create(Job job)
     {
-        if (await MissingPrices(job) is string problem)
-            return BadPrices(problem);
+        if (await Invalid(job) is ActionResult refused)
+            return refused;
         job.Id = 0;
         job.CreatedDate = DateTime.UtcNow;
         ResetChildRows(job);
@@ -48,8 +49,8 @@ public class JobsController(AppDbContext db) : ControllerBase
         Job? job = await FullJobs.SingleOrDefaultAsync(j => j.Id == id);
         if (job is null)
             return NotFound();
-        if (await MissingPrices(changes) is string problem)
-            return BadPrices(problem);
+        if (await Invalid(changes) is ActionResult refused)
+            return refused;
 
         changes.Id = id;
         changes.CreatedDate = job.CreatedDate;
@@ -77,9 +78,30 @@ public class JobsController(AppDbContext db) : ControllerBase
         return NoContent();
     }
 
-    private ActionResult BadPrices(string problem)
+    /// <summary>The saved quote as a PDF for the customer. A job saved without a price has none.</summary>
+    [HttpGet("{id:int}/pdf")]
+    public async Task<IActionResult> Pdf(int id)
     {
-        ModelState.AddModelError("counters", problem);
+        Job? job = await FullJobs.AsNoTracking().SingleOrDefaultAsync(j => j.Id == id);
+        if (job is null)
+            return NotFound();
+        if (job.Total is null)
+            return Conflict("This job was saved without a price. Fix its Checks and save it to get a PDF.");
+        return File(QuotePdf.Create(job), "application/pdf", $"quote-{job.Id}.pdf");
+    }
+
+    private async Task<ActionResult?> Invalid(Job job)
+    {
+        if (await MissingPrices(job) is string problem)
+            return BadRequestFor("counters", problem);
+        if (job.QuoteDrawingSvg is string svg && !QuotePdf.IsSafeDrawing(svg))
+            return BadRequestFor("quoteDrawingSvg", "The plan drawing must be a plain SVG, with no links, scripts, images or styles.");
+        return null;
+    }
+
+    private BadRequestObjectResult BadRequestFor(string field, string problem)
+    {
+        ModelState.AddModelError(field, problem);
         return BadRequest(new ValidationProblemDetails(ModelState));
     }
 

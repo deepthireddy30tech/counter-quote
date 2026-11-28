@@ -37,7 +37,7 @@ public class JobsControllerTests : IDisposable
         [
             new()
             {
-                Room = "Kitchen", MaterialId = _steelGrey, Thickness = 3, EdgeProfileId = _ogee, Backsplash = true,
+                Room = "Kitchen", MaterialId = _steelGrey, Thickness = 3, EdgeProfileId = _ogee, Backsplash = true, Rotation = 90, Mirrored = true,
                 Legs =
                 [
                     new() { Length = 120, Depth = 25.5, BackCovered = true, Cutouts = [new() { Kind = "undermount", Centerline = 60, FaucetHoles = 3 }] },
@@ -76,6 +76,7 @@ public class JobsControllerTests : IDisposable
         Assert.True(job.TearOut);
         Assert.Equal(["Kitchen", "Island"], job.Counters.Select(c => c.Room));
         Counter kitchen = job.Counters[0];
+        Assert.Equal((90, true), (kitchen.Rotation, kitchen.Mirrored));
         Assert.Equal([120.0, 96.0], kitchen.Legs.Select(l => l.Length));
         Assert.True(kitchen.Legs[1].EndFrontRadius);
         Cutout sink = Assert.Single(kitchen.Legs[0].Cutouts);
@@ -142,6 +143,59 @@ public class JobsControllerTests : IDisposable
     {
         Job job = KitchenL();
         job.Counters[1].MaterialId = 9999;
+        using AppDbContext db = CreateDb();
+
+        var result = await new JobsController(db).Create(job);
+
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.Empty(db.Jobs);
+    }
+
+    private const string Drawing = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480"><defs><pattern id="wall" width="6" height="6" patternUnits="userSpaceOnUse"><line x1="0" y1="0" x2="0" y2="6" stroke="#9AA5B1"/></pattern></defs><polygon points="48,48 592,48 592,140 48,140" fill="#E9E4DA"/><line x1="48" y1="48" x2="592" y2="48" stroke="url(#wall)" stroke-width="10"/><text x="320" y="30" font-size="13">10' 0"</text></svg>""";
+
+    [Fact]
+    public async Task A_saved_quote_downloads_as_a_pdf_with_its_drawing()
+    {
+        Job job = KitchenL();
+        job.QuoteDrawingSvg = Drawing;
+        int id = await Create(job);
+        using AppDbContext db = CreateDb();
+
+        var pdf = Assert.IsType<FileContentResult>(await new JobsController(db).Pdf(id));
+
+        Assert.Equal("application/pdf", pdf.ContentType);
+        Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(pdf.FileContents, 0, 4));
+    }
+
+    [Fact]
+    public void A_drawing_whose_text_mentions_href_is_still_safe() =>
+        Assert.True(CounterQuote.Api.Pdf.QuotePdf.IsSafeDrawing("""<svg><text>Edge: Shrefton bevel</text></svg>"""));
+
+    [Fact]
+    public async Task A_job_saved_without_a_price_has_no_pdf()
+    {
+        Job job = KitchenL();
+        job.Total = null;
+        job.LineItems.Clear();
+        int id = await Create(job);
+        using AppDbContext db = CreateDb();
+
+        Assert.IsType<ConflictObjectResult>(await new JobsController(db).Pdf(id));
+        Assert.IsType<NotFoundResult>(await new JobsController(db).Pdf(id + 1));
+    }
+
+    [Theory]
+    [InlineData("""<svg><image href="file:///etc/passwd"/></svg>""")]
+    [InlineData("""<svg><use xlink:href="#a"/></svg>""")]
+    [InlineData("""<!DOCTYPE svg [<!ENTITY x SYSTEM "file:///etc/passwd">]><svg>&x;</svg>""")]
+    [InlineData("""<svg><rect fill="url(http://example.com/a)"/></svg>""")]
+    [InlineData("""<svg><style>@import url(x)</style></svg>""")]
+    [InlineData("""<html><svg/></html>""")]
+    [InlineData("""<svg><a xlink:href="javascript:x"><text>x</text></a></svg>""")]
+    public async Task A_drawing_that_could_reach_outside_itself_is_refused(string svg)
+    {
+        Job job = KitchenL();
+        job.QuoteDrawingSvg = svg;
         using AppDbContext db = CreateDb();
 
         var result = await new JobsController(db).Create(job);
