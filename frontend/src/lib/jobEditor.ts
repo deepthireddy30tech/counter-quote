@@ -110,9 +110,10 @@ export function withRoom(counter: SavedCounter, room: Room): SavedCounter {
 
 /**
  * The job with today's quote attached, ready to save (ADR 0002). A job that can't be priced saves with no quote.
- * A null quote keeps the job's saved quote and its valid-until date, for a job saved without re-pricing.
+ * A null quote keeps the job's saved quote, drawing and valid-until date, for a job saved without re-pricing.
+ * drawing is the plan SVG for the PDF, kept only with a priced quote.
  */
-export function withSavedQuote(job: SavedJob, quote: Quote | null, validDays: number, now: Date): SavedJob {
+export function withSavedQuote(job: SavedJob, quote: Quote | null, validDays: number, now: Date, drawing: string | null): SavedJob {
   const tidied = {
     ...job,
     customerName: job.customerName.trim(),
@@ -128,6 +129,7 @@ export function withSavedQuote(job: SavedJob, quote: Quote | null, validDays: nu
     ...tidied,
     lineItems: quote.items,
     total: quote.total,
+    quoteDrawingSvg: quote.total == null ? null : drawing,
     savedAt: quote.total == null ? null : now.toISOString(),
     validUntil: quote.total == null ? null : validUntil.toISOString(),
   };

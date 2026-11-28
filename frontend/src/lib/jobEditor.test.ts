@@ -66,22 +66,22 @@ describe('withSavedQuote', () => {
     job.customerName = ' Ana Ruiz ';
     job.additionalRequirements = [{ description: ' ', price: 50 }, { description: 'Outlet cutout ', price: NaN }];
     const quote = priceJob(toQuoteJob(job), toQuotePrices(prices), 'in');
-    const saved = withSavedQuote(job, quote, 30, new Date('2026-11-27T15:00:00Z'));
-    expect(saved).toMatchObject({ customerName: 'Ana Ruiz', total: 1805, savedAt: '2026-11-27T15:00:00.000Z', validUntil: '2026-12-27T15:00:00.000Z' });
+    const saved = withSavedQuote(job, quote, 30, new Date('2026-11-27T15:00:00Z'), '<svg/>');
+    expect(saved).toMatchObject({ customerName: 'Ana Ruiz', total: 1805, savedAt: '2026-11-27T15:00:00.000Z', validUntil: '2026-12-27T15:00:00.000Z', quoteDrawingSvg: '<svg/>' });
     expect(saved.additionalRequirements).toEqual([{ description: 'Outlet cutout', price: 0 }]);
     expect(saved.lineItems).toHaveLength(5);
   });
 
   it('keeps the saved quote and its valid-until date when not re-priced', () => {
-    const job = { ...sampleJob(3, 5), customerName: 'Ana ', total: 999, savedAt: '2026-11-01T00:00:00.000Z', validUntil: '2026-12-01T00:00:00.000Z' };
-    expect(withSavedQuote(job, null, 30, new Date('2026-11-27T15:00:00Z')))
-      .toMatchObject({ customerName: 'Ana', total: 999, savedAt: '2026-11-01T00:00:00.000Z', validUntil: '2026-12-01T00:00:00.000Z' });
+    const job = { ...sampleJob(3, 5), customerName: 'Ana ', total: 999, savedAt: '2026-11-01T00:00:00.000Z', validUntil: '2026-12-01T00:00:00.000Z', quoteDrawingSvg: '<svg>old</svg>' };
+    expect(withSavedQuote(job, null, 30, new Date('2026-11-27T15:00:00Z'), '<svg/>'))
+      .toMatchObject({ customerName: 'Ana', total: 999, quoteDrawingSvg: '<svg>old</svg>', savedAt: '2026-11-01T00:00:00.000Z', validUntil: '2026-12-01T00:00:00.000Z' });
   });
 
   it('keeps no quote for a job that can’t be priced', () => {
     const job = sampleJob(3, 5);
     job.counters[0].legs[0].length = 10; // the sink no longer fits
     const quote = priceJob(toQuoteJob(job), toQuotePrices(prices), 'in');
-    expect(withSavedQuote(job, quote, 30, new Date())).toMatchObject({ total: null, savedAt: null, validUntil: null, lineItems: [] });
+    expect(withSavedQuote(job, quote, 30, new Date(), '<svg/>')).toMatchObject({ total: null, savedAt: null, validUntil: null, quoteDrawingSvg: null, lineItems: [] });
   });
 });

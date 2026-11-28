@@ -34,6 +34,12 @@ beforeEach(() => {
 });
 
 describe('a reopened job', () => {
+  it('links to the PDF of its saved quote', async () => {
+    vi.mocked(getJob).mockResolvedValue(savedJob());
+    renderAt('/jobs/9');
+    expect((await screen.findByRole('link', { name: 'PDF of saved quote' })).getAttribute('href')).toBe('/api/jobs/9/pdf');
+  });
+
   it('shows its saved quote and a notice that today’s prices differ', async () => {
     vi.mocked(getJob).mockResolvedValue(savedJob());
     renderAt('/jobs/9');
@@ -89,6 +95,10 @@ describe('a reopened job', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save job' }));
     const sent = vi.mocked(updateJob).mock.calls[0][0];
     expect(sent.total).toBe(1805);
+    // the PDF's plan: every counter, by name, with no click targets
+    expect(sent.quoteDrawingSvg).toMatch(/^<svg xmlns="http:\/\/www.w3.org\/2000\/svg"/);
+    expect(sent.quoteDrawingSvg).toContain('>Kitchen L</text>');
+    expect(sent.quoteDrawingSvg).not.toContain('class="hit"');
     const days = (Date.parse(sent.validUntil!) - Date.now()) / 86_400_000;
     expect(days).toBeGreaterThan(29); // quoteValidDays is 30
     expect(days).toBeLessThanOrEqual(30);
