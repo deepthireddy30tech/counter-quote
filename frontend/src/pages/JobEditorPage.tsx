@@ -49,11 +49,12 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
 
   const quotePrices = useMemo(() => toQuotePrices(prices), [prices]);
   const quote = useMemo(() => priceJob(toQuoteJob(job), quotePrices, unit), [job, quotePrices, unit]);
-  const unsaved = JSON.stringify(job) !== JSON.stringify(stored);
   // a reopened job shows its saved quote until the design is edited or the salesperson re-prices it (ADR 0002)
   const live = repriced || stored.total == null;
+  // a re-priced quote replaces the saved one only on save, so it counts as a change
+  const unsaved = JSON.stringify(job) !== JSON.stringify(stored) || (repriced && stored.total != null);
   const shown = live ? quote : { items: stored.lineItems, total: stored.total };
-  const pricesChanged = !live && (quote.total == null || Math.abs(quote.total - stored.total!) >= 0.005);
+  const pricesChanged = !live && quote.total !== stored.total // both rounded to cents;
   useLeaveWarning(unsaved, 'Leave without saving? Your changes to this job will be lost.');
 
   const save = useMutation({
@@ -124,7 +125,7 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
       </div>
       {blankSizes && <p className="errors">Some sizes are empty or can't be read. Fix the boxes marked in red, then save.</p>}
       {save.error && <p className="errors">{save.error.message}</p>}
-      {justSaved && <p className="saved">{stored.validUntil ? `Saved. The quote is kept as priced today, valid until ${new Date(stored.validUntil).toLocaleDateString()}.` : 'Saved without a price. Fix the Checks to price it.'}</p>}
+      {justSaved && <p className="saved">{stored.validUntil ? `Saved. The quote is kept at the prices of ${new Date(stored.savedAt!).toLocaleDateString()}, valid until ${new Date(stored.validUntil).toLocaleDateString()}.` : 'Saved without a price. Fix the Checks to price it.'}</p>}
 
       <div className="tabs" role="tablist">
         {names.map((n, i) => (

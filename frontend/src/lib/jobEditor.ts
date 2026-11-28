@@ -111,8 +111,6 @@ export function withRoom(counter: SavedCounter, room: Room): SavedCounter {
  * A null quote keeps the job's saved quote and its valid-until date, for a job saved without re-pricing.
  */
 export function withSavedQuote(job: SavedJob, quote: Quote | null, validDays: number, now: Date): SavedJob {
-  const validUntil = new Date(now);
-  validUntil.setDate(validUntil.getDate() + validDays);
   const tidied = {
     ...job,
     customerName: job.customerName.trim(),
@@ -122,6 +120,8 @@ export function withSavedQuote(job: SavedJob, quote: Quote | null, validDays: nu
       .map((r) => ({ description: r.description.trim(), price: r.price || 0 })),
   };
   if (!quote) return tidied;
+  const validUntil = new Date(now);
+  validUntil.setDate(validUntil.getDate() + validDays);
   return {
     ...tidied,
     lineItems: quote.items,
