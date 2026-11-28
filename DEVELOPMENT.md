@@ -17,7 +17,9 @@ frontend/src/
   pages/         one file per screen
   components/    parts a screen is built from (the counter plan)
   hooks/         React hooks shared by screens
-  lib/           pure logic (measurements, geometry, pricing) with Vitest tests next to it
+  lib/           pure logic (measurements, geometry, pricing)
+  test/          helpers for the tests: renderAt opens a screen in jsdom, prices is a small price list
+                 Vitest tests sit next to the file they test; page tests mock api.ts
   main.tsx       routes
 data/app.db      the database, created on first run
 ```
@@ -32,6 +34,7 @@ The web app runs on port 5173 and the API on 5080. Vite sends `/api` to the API.
 | Run the web app | `frontend` | `npm install`, then `npm run dev` |
 | Run the backend tests | `backend` | `dotnet test` |
 | Run the frontend tests | `frontend` | `npm test` |
+| See frontend test coverage | `frontend` | `npm run test:coverage` (report in `frontend/coverage/`) |
 | Check the frontend | `frontend` | `npm run build` |
 | Change the database | `backend/CounterQuote.Api` | `dotnet tool restore`, then `dotnet ef migrations add <Name>` |
 

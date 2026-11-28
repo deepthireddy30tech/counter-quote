@@ -112,6 +112,17 @@ public class JobsControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task The_job_list_is_newest_first_with_each_jobs_counters_and_legs()
+    {
+        int older = await Create(KitchenL("Rivera"));
+        int newer = await Create(KitchenL("Okafor"));
+        using var db = CreateDb();
+        var jobs = await new JobsController(db).GetAll();
+        Assert.Equal([newer, older], jobs.Select(j => j.Id));
+        Assert.All(jobs, j => Assert.NotEmpty(j.Counters[0].Legs));
+    }
+
+    [Fact]
     public async Task Deleting_a_job_deletes_its_child_rows()
     {
         int id = await Create(KitchenL());
