@@ -1,0 +1,275 @@
+// @vitest-environment jsdom
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createJob, getJob, getJobs, getPriceList, type Job, updateJob } from '../api';
+import { sampleJob } from '../lib/jobEditor';
+import { prices } from '../test/prices';
+import { renderAt } from '../test/render';
+
+vi.mock('../api');
+
+/** Plan shapes by their SVG tooltip; getByTitle only finds a <title> directly under the <svg>. */
+const byTitle = (text: string) => [...document.querySelectorAll('title')].filter((t) => t.textContent === text).map((t) => t.parentElement!);
+
+const total = () => screen.getByText(/^\$|^—$/, { selector: '.total strong' }).textContent;
+
+/** The sample Kitchen L, saved on 1 Nov at an older price of $1234.50. Today's prices give $1805.00. */
+const savedJob = (changes: Partial<Job> = {}): Job => ({
+  ...sampleJob(3, 5),
+  id: 9,
+  customerName: 'Ana Ruiz',
+  total: 1234.5,
+  savedAt: '2026-11-01T15:00:00.000Z',
+  validUntil: '2099-12-01T15:00:00.000Z',
+  lineItems: [{ counter: 'Kitchen L', description: 'Old saved line', quantity: 1, unit: 'job', rate: 1234.5, amount: 1234.5 }],
+  ...changes,
+});
+
+beforeEach(() => {
+  vi.mocked(getPriceList).mockResolvedValue(prices());
+  vi.mocked(getJobs).mockResolvedValue([]);
+  vi.mocked(createJob).mockImplementation(async (j) => ({ ...j, id: 12 }));
+  vi.mocked(updateJob).mockImplementation(async (j) => j);
+});
+
+describe('a reopened job', () => {
+  it('shows its saved quote and a notice that today’s prices differ', async () => {
+    vi.mocked(getJob).mockResolvedValue(savedJob());
+    renderAt('/jobs/9');
+    expect(await screen.findByText('Old saved line')).toBeTruthy();
+    expect(total()).toBe('$1234.50');
+    expect(screen.getByText(/Saved .*, valid until/)).toBeTruthy();
+    expect(screen.getByText(/Prices have changed\. Saved total \$1234\.50; at today's prices \$1805\.00\./)).toBeTruthy();
+    expect(screen.queryByText('Unsaved changes')).toBeNull();
+  });
+
+  it('shows no notice when today’s prices give the same total', async () => {
+    vi.mocked(getJob).mockResolvedValue(savedJob({ total: 1805 }));
+    renderAt('/jobs/9');
+    await screen.findByText('Old saved line');
+    expect(screen.queryByText(/Prices have changed/)).toBeNull();
+  });
+
+  it('switches to today’s prices on Re-price, which is an unsaved change', async () => {
+    vi.mocked(getJob).mockResolvedValue(savedJob());
+    renderAt('/jobs/9');
+    await userEvent.click(await screen.findByRole('button', { name: 'Re-price' }));
+    expect(total()).toBe('$1805.00');
+    expect(screen.queryByText('Old saved line')).toBeNull();
+    expect(screen.queryByText(/Prices have changed/)).toBeNull();
+    expect(screen.getByText('Unsaved changes')).toBeTruthy();
+  });
+
+  it('switches to today’s prices when the job is edited, but not when only the customer name is', async () => {
+    vi.mocked(getJob).mockResolvedValue(savedJob());
+    renderAt('/jobs/9');
+    await userEvent.type(await screen.findByLabelText('Customer'), 'z');
+    expect(total()).toBe('$1234.50');
+    await userEvent.click(screen.getByLabelText('Tear-out of old counters'));
+    expect(total()).toBe('$2205.00');
+  });
+
+  it('saves without re-pricing by keeping the saved quote and its valid-until date', async () => {
+    vi.mocked(getJob).mockResolvedValue(savedJob());
+    const confirm = vi.spyOn(window, 'confirm');
+    renderAt('/jobs/9');
+    await userEvent.click(await screen.findByRole('button', { name: 'Save job' }));
+    expect(confirm).not.toHaveBeenCalled();
+    expect(vi.mocked(updateJob).mock.calls[0][0]).toMatchObject({ total: 1234.5, validUntil: '2099-12-01T15:00:00.000Z' });
+    expect(await screen.findByText(/Saved\. The quote is kept at the prices of .*, valid until/)).toBeTruthy();
+  });
+
+  it('saves a re-priced quote with a new valid-until date', async () => {
+    vi.mocked(getJob).mockResolvedValue(savedJob());
+    renderAt('/jobs/9');
+    await userEvent.click(await screen.findByRole('button', { name: 'Re-price' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save job' }));
+    const sent = vi.mocked(updateJob).mock.calls[0][0];
+    expect(sent.total).toBe(1805);
+    expect(sent.validUntil).not.toBe('2099-12-01T15:00:00.000Z');
+    await waitFor(() => expect(screen.queryByText('Unsaved changes')).toBeNull());
+  });
+
+  it('asks before saving a quote past its valid-until date', async () => {
+    vi.mocked(getJob).mockResolvedValue(savedJob({ validUntil: '2020-01-01T00:00:00.000Z' }));
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    renderAt('/jobs/9');
+    expect(await screen.findByText(/no longer valid since/)).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Save job' }));
+    expect(confirm).toHaveBeenCalledWith(expect.stringMatching(/past its valid-until date/));
+    expect(updateJob).not.toHaveBeenCalled();
+    confirm.mockReturnValue(true);
+    await userEvent.click(screen.getByRole('button', { name: 'Save job' }));
+    expect(vi.mocked(updateJob).mock.calls[0][0]).toMatchObject({ total: 1234.5, validUntil: '2020-01-01T00:00:00.000Z' });
+  });
+
+  it('asks before a re-price that today’s price list can’t price wipes the saved quote', async () => {
+    const job = savedJob();
+    job.counters[0].materialId = 99; // since removed from the price list
+    vi.mocked(getJob).mockResolvedValue(job);
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    renderAt('/jobs/9');
+    expect(await screen.findByText(/at today's prices it can't be priced/)).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'No longer in the price list' })).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Re-price' }));
+    expect(total()).toBe('—');
+    await userEvent.click(screen.getByRole('button', { name: 'Save job' }));
+    expect(confirm).toHaveBeenCalledWith(expect.stringMatching(/removes its saved quote of \$1234\.50/));
+    expect(updateJob).not.toHaveBeenCalled();
+  });
+
+  it('says when the job or the price list can’t be loaded', async () => {
+    vi.mocked(getJob).mockRejectedValue(new Error('Request failed (404)'));
+    renderAt('/jobs/9');
+    expect(await screen.findByText('Request failed (404)')).toBeTruthy();
+  });
+});
+
+describe('a new job', () => {
+  it('opens the sample Kitchen L priced from today’s list, and moves to its own address once saved', async () => {
+    const router = renderAt('/jobs/new');
+    expect(await screen.findByRole('tab', { name: 'Kitchen L' })).toBeTruthy();
+    expect(total()).toBe('$1805.00');
+    await userEvent.type(screen.getByLabelText('Customer'), ' Ana Ruiz ');
+    await userEvent.click(screen.getByRole('button', { name: 'Save job' }));
+    expect(vi.mocked(createJob).mock.calls[0][0]).toMatchObject({ customerName: 'Ana Ruiz', total: 1805 });
+    await waitFor(() => expect(router.state.location.pathname).toBe('/jobs/12'));
+    expect(await screen.findByText(/Saved\. The quote is kept/)).toBeTruthy();
+  });
+
+  it('won’t save while a size box is blank', async () => {
+    renderAt('/jobs/new');
+    await userEvent.clear(await screen.findByLabelText('Leg 1 length'));
+    await userEvent.type(screen.getByLabelText('Customer'), 'Ana');
+    await userEvent.click(screen.getByRole('button', { name: 'Save job' }));
+    expect(screen.getByText(/Some sizes are empty or can't be read/)).toBeTruthy();
+    expect(screen.getByLabelText('Leg 1 length').getAttribute('aria-invalid')).toBe('true');
+    expect(createJob).not.toHaveBeenCalled();
+  });
+
+  it('shows an error for an address that isn’t a job', async () => {
+    renderAt('/jobs/abc');
+    expect(await screen.findByText('There is no job abc.')).toBeTruthy();
+  });
+
+  it('says why a save failed', async () => {
+    vi.mocked(createJob).mockRejectedValue(new Error('A job can have at most 20 counters.'));
+    renderAt('/jobs/new');
+    await userEvent.type(await screen.findByLabelText('Customer'), 'Ana');
+    await userEvent.click(screen.getByRole('button', { name: 'Save job' }));
+    expect(await screen.findByText('A job can have at most 20 counters.')).toBeTruthy();
+  });
+});
+
+describe('editing a counter', () => {
+  beforeEach(async () => {
+    renderAt('/jobs/new');
+    await screen.findByRole('tab', { name: 'Kitchen L' });
+  });
+
+  it('changes the layout, room, legs and sizes', async () => {
+    await userEvent.selectOptions(screen.getByLabelText('Layout'), 'U');
+    expect(screen.getByText('Leg 3', { selector: 'legend' })).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Remove leg 3' }));
+    expect(screen.queryByText('Leg 3', { selector: 'legend' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: '+ Add leg' }));
+    expect(screen.getByText('Leg 3', { selector: 'legend' })).toBeTruthy();
+    fireEvent.change(screen.getAllByLabelText('Turn °')[1], { target: { value: '135' } });
+    expect((screen.getByLabelText('Layout') as HTMLSelectElement).value).toBe('Custom');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Leg 1 length larger' }));
+    expect((screen.getByLabelText('Leg 1 length') as HTMLInputElement).value).toBe('10′ 1″');
+    await userEvent.click(screen.getByRole('button', { name: 'Leg 1 length smaller' }));
+    expect((screen.getByLabelText('Leg 1 length') as HTMLInputElement).value).toBe('10′ 0″');
+    await userEvent.click(screen.getByRole('button', { name: 'metres' }));
+    expect((screen.getByLabelText('Leg 1 length') as HTMLInputElement).value).toBe('3.048 m');
+
+    await userEvent.selectOptions(screen.getByLabelText('Room'), 'Island');
+    expect((screen.getByLabelText('Leg 1 depth') as HTMLInputElement).value).toBe('91.4 cm');
+  });
+
+  it('changes the material, thickness, edge profile and backsplash', async () => {
+    await userEvent.click(screen.getByRole('button', { name: '2 cm' }));
+    expect(screen.getByText('Steel Grey, 2 cm')).toBeTruthy();
+    await userEvent.selectOptions(screen.getByLabelText('Material'), 'Steel Grey');
+    await userEvent.selectOptions(screen.getByLabelText('Edge profile'), 'Eased');
+    await userEvent.click(screen.getByLabelText(/backsplash on covered edges/));
+    expect(screen.getByText(/backsplash/i, { selector: '.quote td' })).toBeTruthy();
+  });
+
+  it('adds, changes, moves and removes cutouts', async () => {
+    await userEvent.click(screen.getByRole('button', { name: '+ Add cutout' }));
+    expect(screen.getByText('Undermount sink 2')).toBeTruthy();
+    const second = screen.getByText('Undermount sink 2').closest('fieldset')!;
+    await userEvent.selectOptions(within(second).getByLabelText('Kind'), 'cooktop');
+    const cooktop = screen.getByText('Cooktop 2').closest('fieldset')!;
+    expect(within(cooktop).queryByLabelText('Faucet holes')).toBeNull();
+    await userEvent.selectOptions(within(cooktop).getByLabelText('On leg'), '1');
+    fireEvent.change(within(screen.getByText('Undermount sink 1').closest('fieldset')!).getByLabelText('Faucet holes'), { target: { value: '3' } });
+    expect(screen.getByText('Faucet hole', { selector: '.quote td *, .quote td' })).toBeTruthy();
+    await userEvent.click(within(screen.getByText('Cooktop 2').closest('fieldset')!).getByRole('button', { name: 'Remove' }));
+    expect(screen.queryByText('Cooktop 2')).toBeNull();
+  });
+
+  it('switches edges and corners from the plan or the folded boxes', async () => {
+    await userEvent.click(byTitle('Leg 1 front: exposed')[0]);
+    expect(byTitle('Leg 1 front: covered')).toHaveLength(1);
+    await userEvent.click(screen.getByLabelText('Leg 1 front'));
+    expect(byTitle('Leg 1 front: exposed')).toHaveLength(1);
+
+    const corners = byTitle('Square corner');
+    await userEvent.click(corners[0]);
+    expect(byTitle('Radius corner')).toHaveLength(1);
+    expect(screen.getByText('Radius corner', { selector: '.quote td *, .quote td' })).toBeTruthy();
+    const box = screen.getAllByLabelText(/radius corner$/).find((b) => (b as HTMLInputElement).checked)!;
+    await userEvent.click(box);
+    expect(byTitle('Radius corner')).toHaveLength(0);
+  });
+
+  it('adds and removes counters and additional requirements', async () => {
+    await userEvent.click(screen.getByRole('button', { name: '+ Add counter' }));
+    expect(screen.getAllByRole('tab')).toHaveLength(2);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await userEvent.click(screen.getByRole('button', { name: 'Remove this counter' }));
+    expect(screen.getAllByRole('tab')).toHaveLength(1);
+
+    await userEvent.click(screen.getByRole('button', { name: '+ Add requirement' }));
+    await userEvent.type(screen.getByLabelText('Requirement 1'), 'Haul away');
+    await userEvent.type(screen.getByLabelText('Requirement 1 price'), '45');
+    expect(total()).toBe('$1850.00');
+    await userEvent.click(within(screen.getByLabelText('Requirement 1').parentElement!).getByRole('button', { name: 'Remove' }));
+    expect(total()).toBe('$1805.00');
+  });
+
+  it('shows the Checks for a shape that can’t be priced', async () => {
+    const length = screen.getByLabelText('Leg 1 length');
+    await userEvent.clear(length);
+    await userEvent.type(length, '10');
+    expect(screen.getByText(/Leg 1 is too short for its corners/)).toBeTruthy();
+    expect(screen.getByText(/No price until the shape is fixed/)).toBeTruthy();
+    expect(total()).toBe('—');
+  });
+});
+
+describe('leaving with unsaved changes', () => {
+  it('asks first, and stays if the salesperson cancels', async () => {
+    const router = renderAt('/jobs/new');
+    await userEvent.type(await screen.findByLabelText('Customer'), 'Ana');
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    await userEvent.click(screen.getByRole('link', { name: 'Jobs' }));
+    expect(confirm).toHaveBeenCalledWith(expect.stringMatching(/Leave without saving/));
+    expect(router.state.location.pathname).toBe('/jobs/new');
+    confirm.mockReturnValue(true);
+    await userEvent.click(screen.getByRole('link', { name: 'Jobs' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'));
+  });
+
+  it('has the browser ask before the tab is closed', async () => {
+    renderAt('/jobs/new');
+    await userEvent.type(await screen.findByLabelText('Customer'), 'Ana');
+    const event = new Event('beforeunload', { cancelable: true });
+    act(() => { window.dispatchEvent(event); });
+    expect(event.defaultPrevented).toBe(true);
+  });
+});
