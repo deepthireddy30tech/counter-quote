@@ -45,10 +45,15 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
   // a new job's first save moves to its own address, which opens a fresh editor that still says it saved
   const [justSaved, setJustSaved] = useState<boolean>(useLocation().state?.justSaved ?? false);
   const [blankSizes, setBlankSizes] = useState(false);
+  const [repriced, setRepriced] = useState(false);
 
   const quotePrices = useMemo(() => toQuotePrices(prices), [prices]);
   const quote = useMemo(() => priceJob(toQuoteJob(job), quotePrices, unit), [job, quotePrices, unit]);
   const unsaved = JSON.stringify(job) !== JSON.stringify(stored);
+  // a reopened job shows its saved quote until the design is edited or the salesperson re-prices it (ADR 0002)
+  const live = repriced || stored.total == null;
+  const shown = live ? quote : { items: stored.lineItems, total: stored.total };
+  const pricesChanged = !live && (quote.total == null || Math.abs(quote.total - stored.total!) >= 0.005);
   useLeaveWarning(unsaved, 'Leave without saving? Your changes to this job will be lost.');
 
   const save = useMutation({
@@ -59,6 +64,7 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
       setStored(fresh);
       setJob(structuredClone(fresh));
       setJustSaved(true);
+      setRepriced(false);
     },
   });
   // a new job moves to its own address once saved (after the render that clears "unsaved", so nothing blocks it)
@@ -66,12 +72,13 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
     if (saved.id === 0 && stored.id > 0) navigate(`/jobs/${stored.id}`, { replace: true, state: { justSaved: true } });
   }, [saved.id, stored.id, navigate]);
 
-  const change = (edit: (draft: Job) => void) => {
+  const change = (edit: (draft: Job) => void, reprice = true) => {
     const draft = structuredClone(job);
     edit(draft);
     setJob(draft);
     setJustSaved(false);
     setBlankSizes(false);
+    if (reprice) setRepriced(true);
   };
   const counter = job.counters[tab];
   const editCounter = (edit: (c: Counter) => Counter | void) =>
@@ -94,7 +101,7 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
     // the server can't store a box it couldn't read; a shape that only fails Checks still saves, unpriced
     const blank = job.counters.some((c) => c.legs.some((l) => [l.length, l.depth, l.turnAngle, ...l.cutouts.map((x) => x.centerline)].some(Number.isNaN)));
     setBlankSizes(blank);
-    if (!blank) save.mutate(withSavedQuote(job, quote, quoteValidDays(prices), new Date()));
+    if (!blank) save.mutate(withSavedQuote(job, live ? quote : null, quoteValidDays(prices), new Date()));
   };
   const removeCounter = () => {
     if (!window.confirm(`Remove ${name}?`)) return;
@@ -108,7 +115,7 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
     <form onSubmit={handleSubmit} className="editor-page">
       <div className="page-title">
         <label className="customer">
-          Customer <input required maxLength={200} value={job.customerName} onChange={(e) => change((d) => { d.customerName = e.target.value; })} />
+          Customer <input required maxLength={200} value={job.customerName} onChange={(e) => change((d) => { d.customerName = e.target.value; }, false)} />
         </label>
         <div className="page-actions">
           {unsaved && <span className="unsaved">Unsaved changes</span>}
@@ -272,15 +279,26 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
 
         <aside className="card quote">
           <h2>Quote</h2>
-          {quote.total == null ? (
+          {!live && (
+            <p className="muted">
+              Saved {new Date(stored.savedAt!).toLocaleDateString()}, {new Date(stored.validUntil!) < new Date() ? 'no longer valid since' : 'valid until'} {new Date(stored.validUntil!).toLocaleDateString()}.
+            </p>
+          )}
+          {pricesChanged && (
+            <div className="warnings">
+              Prices have changed. Saved total ${stored.total!.toFixed(2)}; at today's prices {quote.total == null ? "it can't be priced" : `$${quote.total.toFixed(2)}`}.
+              {' '}<button type="button" className="link" onClick={() => setRepriced(true)}>Re-price</button>
+            </div>
+          )}
+          {shown.total == null ? (
             <p className="errors">No price until the shape is fixed. See Checks on: {names.filter((n) => quote.errors.some((m) => m.startsWith(`${n}: `))).join(', ')}.</p>
           ) : (
             <table>
               <tbody>
-                {quote.items.map((x, i) => (
+                {shown.items.map((x, i) => (
                   <tr key={i}>
                     <td>
-                      {(i === 0 || quote.items[i - 1].counter !== x.counter) && <strong className="group">{x.counter}</strong>}
+                      {(i === 0 || shown.items[i - 1].counter !== x.counter) && <strong className="group">{x.counter}</strong>}
                       {x.description}
                       <div className="muted">{x.unit === 'job' ? '' : `${x.quantity} ${x.unit} × $${x.rate.toFixed(2)}`}</div>
                     </td>
@@ -310,7 +328,7 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
               + Add requirement
             </button>
           </fieldset>
-          <p className="total">Total <strong>{quote.total == null ? '—' : `$${quote.total.toFixed(2)}`}</strong></p>
+          <p className="total">Total <strong>{shown.total == null ? '—' : `$${shown.total.toFixed(2)}`}</strong></p>
         </aside>
       </div>
     </form>
