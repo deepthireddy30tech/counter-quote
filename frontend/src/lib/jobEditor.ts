@@ -1,6 +1,8 @@
 import type { Counter as SavedCounter, Job as SavedJob, Leg as SavedLeg, PriceList as SavedPriceList } from '../api';
 import type { Counter, FeeKind, Job, PriceList, Quote, Room } from './quote';
 
+/** The most the API accepts (the [MaxLength] checks on backend/CounterQuote.Api/Models); keep the two in step. */
+export const LIMITS = { counters: 20, legs: 12, cutoutsPerLeg: 10, requirements: 50 };
 export const ROOMS: Room[] = ['Kitchen', 'Island', 'Bathroom', 'Other'];
 /** The layouts a counter can be set to, by number of legs. Angled corners or more legs make it Custom. */
 export const LAYOUTS = { Straight: { legs: 1, name: 'Straight' }, L: { legs: 2, name: 'L-shape' }, U: { legs: 3, name: 'U-shape' } } as const;
