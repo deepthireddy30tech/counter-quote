@@ -19,6 +19,6 @@ public class Counter
     public int EdgeProfileId { get; set; }
     public bool Backsplash { get; set; }
 
-    [MinLength(1)]
+    [MinLength(1), MaxLength(12, ErrorMessage = "A counter can have at most 12 legs.")]
     public List<Leg> Legs { get; set; } = [];
 }
