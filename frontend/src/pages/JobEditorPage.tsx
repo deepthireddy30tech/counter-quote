@@ -102,7 +102,12 @@ function JobEditor({ saved, prices }: { saved: Job; prices: PriceList }) {
     // the server can't store a box it couldn't read; a shape that only fails Checks still saves, unpriced
     const blank = job.counters.some((c) => c.legs.some((l) => [l.length, l.depth, l.turnAngle, ...l.cutouts.map((x) => x.centerline)].some(Number.isNaN)));
     setBlankSizes(blank);
-    if (!blank) save.mutate(withSavedQuote(job, live ? quote : null, quoteValidDays(prices), new Date()));
+    if (blank) return;
+    const expired = !live && stored.validUntil != null && new Date(stored.validUntil) < new Date();
+    if (expired && !window.confirm('This quote is past its valid-until date. Save it with its old prices anyway? Choose Cancel, then Re-price, for today\'s prices.')) return;
+    const erasing = live && quote.total == null && stored.total != null;
+    if (erasing && !window.confirm(`Today's price list can't price this job, so saving removes its saved quote of $${stored.total!.toFixed(2)}. Save anyway?`)) return;
+    save.mutate(withSavedQuote(job, live ? quote : null, quoteValidDays(prices), new Date()));
   };
   const removeCounter = () => {
     if (!window.confirm(`Remove ${name}?`)) return;
